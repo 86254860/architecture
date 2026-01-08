@@ -9,8 +9,9 @@ This guide provides a standardized set of Makefile targets and conventions appli
 1. [Overview](#overview)
 2. [Goals](#goals)
 3. [Standard Targets](#standard-targets)
-4. [Flag Conventions](#flag-conventions)
-5. [References](#references)
+4. [Repository Type Variations](#repository-type-variations)
+5. [Flag Conventions](#flag-conventions)
+6. [References](#references)
 
 ---
 
@@ -61,7 +62,8 @@ All HyperFleet repositories **MUST** implement these targets:
 | `lint` | Run linters | Execute configured linters (golangci-lint, yamllint, etc.) | Linting violations or success |
 | `clean` | Remove build artifacts | Delete all generated files (binaries, coverage, build cache) | Empty `bin/`, `build/` directories |
 
-**Example invocation:**
+### Example: Required targets
+
 ```bash
 make help           # See all available targets
 make build          # Compile binaries
@@ -77,9 +79,9 @@ Repositories **MAY** implement these targets if applicable:
 | Target | Description | When to Use | Example |
 |--------|-------------|-------------|---------|
 | `generate` | Generate code from specifications | If repo uses code generation (OpenAPI, Protocol Buffers, etc.) | Generate Go models from OpenAPI specs |
-| `test-all` | Run all tests and checks | Comprehensive pre-commit validation | Runs test + lint + test-integration + test-helm |
+| `test-all` | Run all tests and checks | Comprehensive pre-commit validation | Runs test + lint + test-integration + helm-test |
 | `test-integration` | Run integration tests | If repo has integration tests requiring external dependencies | Tests against real GCP/K8s |
-| `test-helm` | Run all Helm validation | If repo contains Helm charts | Runs helm-lint + helm-template |
+| `helm-test` | Run all Helm validation | If repo contains Helm charts | Runs helm-lint + helm-template |
 | `image` | Build container image | If repo produces a container image | `make image IMAGE_TAG=v1.0.0` |
 | `image-push` | Push container image to registry | If repo publishes to container registry | `make image-push` |
 | `helm-lint` | Lint Helm charts | If repo contains Helm charts | Validate chart syntax |
@@ -87,12 +89,13 @@ Repositories **MAY** implement these targets if applicable:
 | `deploy` | Deploy to environment | If repo has deployment logic | Deploy to dev/staging |
 | `run` | Run the application locally | For services that can run standalone | Start local server |
 
-**Example invocation:**
+### Example: Optional targets
+
 ```bash
 make generate                   # Generate code from specs
 make test-all                   # Run all tests and checks (recommended before commit)
 make test-integration           # Run integration tests
-make test-helm                  # Run all Helm validation (lint + template)
+make helm-test                  # Run all Helm validation (lint + template)
 make image IMAGE_TAG=v1.0.0    # Build container image
 make image-push                 # Push to registry
 ```
@@ -142,6 +145,115 @@ coverage.txt
 coverage.html
 coverage.out
 *.coverprofile
+```
+
+---
+
+## Repository Type Variations
+
+Not all HyperFleet repositories build binaries. Helm-chart and deployment repositories have different build patterns but should still follow consistent conventions. This section documents equivalent targets for different repository types.
+
+### Repository Types
+
+| Type | Description | Examples |
+|------|-------------|----------|
+| **Service** | Repositories that compile Go binaries | adapter-pullsecret, sentinel |
+| **Helm-chart** | Repositories containing only Helm charts for deployment | adapter-landing-zone |
+| **Infrastructure** | Repositories with infrastructure-as-code (Terraform, scripts) | hyperfleet-infrastructure |
+| **Documentation** | Repositories containing only documentation (Makefile not required) | hyperfleet-architecture |
+
+### Target Equivalents for Helm-chart Repositories
+
+Helm-chart repositories do not build binaries, so the standard required targets have different equivalents:
+
+| Standard Target | Helm-chart Equivalent | Notes |
+|-----------------|----------------------|-------|
+| `build` | N/A | No binaries to build; not applicable for Helm-chart repositories |
+| `test` | `helm-test` | Runs `helm-lint` + `helm-template` validation |
+| `lint` | `helm-lint` | Validates chart syntax and best practices |
+| `clean` | `helm-uninstall` or N/A | Removes installed releases; may be omitted if not applicable |
+| `help` | `help` | Still required; lists available targets |
+
+### Repository Type Indicator
+
+To help tooling identify repository types, repositories **SHOULD** include a `.hyperfleet.yaml` file in the root directory. This file is preferred over GitHub Topics because it works offline, is version-controlled, and supports structured metadata:
+
+```yaml
+# .hyperfleet.yaml - Repository metadata for HyperFleet tooling
+version: v1
+repository:
+  types: [helm-chart]  # List of repository types (see Repository Types table above)
+  name: adapter-landing-zone
+  description: Helm charts for adapter deployment landing zone
+```
+
+### Supported repository types
+
+| Type | Value | Required Targets |
+|------|-------|------------------|
+| Service | `service` | `help`, `build`, `test`, `lint`, `clean` |
+| Helm-chart | `helm-chart` | `help`, `helm-lint`, `helm-template`, `helm-test` |
+| Infrastructure | `infrastructure` | `help`, `lint`, `clean` |
+| Documentation | `documentation` | Makefile not required |
+
+### Audit Tool Behavior
+
+The standards-audit tool recognizes repository type variations:
+
+1. **With `.hyperfleet.yaml`**: The tool reads the repository types and validates against the appropriate target sets
+2. **Without `.hyperfleet.yaml`**: The tool defaults to `service` type and expects standard targets
+3. **Auto-detection fallback**: If no `.hyperfleet.yaml` exists, the tool may infer type from:
+   - Presence of `charts/` directory → `helm-chart`
+   - Presence of `go.mod` → `service`
+   - Presence of `terraform/` directory → `infrastructure`
+   - Only `.md` files → `documentation`
+
+> **Note:** Targets are additive. The repository types define the **minimum required targets**. A repository with multiple types must include the required targets for each type.
+
+### Example: Service repository with Helm charts
+
+A repository that builds binaries and also contains Helm charts would declare both types:
+
+```yaml
+# .hyperfleet.yaml
+version: v1
+repository:
+  types: [service, helm-chart]  # Must satisfy required targets for both types
+  name: my-adapter
+  description: Adapter service with deployment charts
+```
+
+```makefile
+# Required targets from 'service' type
+help:           ## Show this help
+build:          ## Build the binary
+test:           ## Run tests
+lint:           ## Run linters
+clean:          ## Clean build artifacts
+
+# Required targets from 'helm-chart' type
+helm-lint:      ## Lint Helm charts
+helm-template:  ## Render Helm templates
+helm-test:      ## Run Helm tests
+```
+
+### Example audit output for Helm-chart repository
+
+```plaintext
+Repository: adapter-landing-zone
+Types: [helm-chart] (from .hyperfleet.yaml)
+
+Required Targets:
+  ✓ help
+  ✓ helm-lint
+  ✓ helm-template
+  ✓ helm-test
+
+Optional Targets:
+  ○ helm-uninstall (not found)
+  ○ deploy (not found)
+
+Status: COMPLIANT
 ```
 
 ---

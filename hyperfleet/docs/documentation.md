@@ -16,7 +16,7 @@ This document establishes the standard approach for structuring documentation ac
 
 All HyperFleet repositories MUST follow this directory structure:
 
-```
+```text
 repository-name/
 ├── README.md                    # Project overview and getting started (REQUIRED)
 ├── CONTRIBUTING.md              # Development and contribution guidelines (REQUIRED)
@@ -153,7 +153,7 @@ Every repository MUST include a CONTRIBUTING.md file with these sections:
 ```markdown
 ## Commit Standards
 
-This project follows [HyperFleet commit standards](../architecture/hyperfleet/standards/commit-standard.md).
+This project follows [HyperFleet commit standards](../standards/commit-standard.md).
 ```
 
 ### 6. Release Process (if applicable)
@@ -177,6 +177,8 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
 
 ### Added
 - New features

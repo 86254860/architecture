@@ -46,7 +46,7 @@ make db/setup
 # 4. Run migrations (if applicable)
 ./bin/[binary-name] migrate
 
-# 6. Start service
+# 5. Start service
 make run
 ```
 

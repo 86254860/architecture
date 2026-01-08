@@ -40,6 +40,7 @@ repository-name/
 - Component design documents
 - Integration patterns
 - Performance and scaling considerations
+- Architecture Decision Records (ADRs) - if used by the team
 
 #### `/docs/examples/`
 - Usage examples and tutorials
@@ -199,6 +200,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 ```
+
+---
+
+## API Documentation Approach
+
+### REST APIs
+- **MUST** use OpenAPI 3.0 specifications
+- **MUST** embed specifications using `//go:embed` for Go services (following hyperfleet-api pattern)
+- **SHOULD** provide Swagger UI endpoints for interactive exploration
+- **MUST** include API examples in documentation
+
+### Go Packages
+- **MUST** use standard `godoc` conventions
+- **SHOULD** include package-level documentation
+- **MUST** document public functions, types, and methods
+
+### API Documentation Location
+- OpenAPI specs: `docs/api/openapi.yaml` or embedded in code
+- API guides: `docs/api/README.md` or main README.md if simple
+- Integration examples: `docs/examples/` or main README.md if simple
+
+---
+
+## Architecture Decision Records (ADRs)
+
+ADRs are **optional** but recommended for complex components that require architectural decisions to be documented.
+
+### ADR Location (if used)
+- **Location**: `docs/architecture/adr/` directory
+- **Naming**: `NNNN-title-of-decision.md` (e.g., `0001-use-openapi-for-api-specs.md`)
+- **Format**: Follow standard ADR template with Status, Context, Decision, Consequences
+
+### When to Use ADRs
+- Significant architectural decisions that affect multiple components
+- Technology choices with trade-offs that should be documented
+- Design patterns that need rationale for future reference
+- Integration approaches between HyperFleet components
 
 ---
 

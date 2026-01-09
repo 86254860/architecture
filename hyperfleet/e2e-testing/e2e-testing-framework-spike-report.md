@@ -12,7 +12,7 @@
 
 This spike report evaluates E2E testing frameworks for **Hyperfleet's core data flow**—testing the end-to-end pipeline: Hyperfleet API → Sentinel → Message Broker → Adapters → back to API.
 
-**✅ Decision: Ginkgo v2 + Gomega + Markdown Documentation**
+### ✅ Decision: Ginkgo v2 + Gomega + Markdown Documentation
 
 After evaluating Ginkgo v2, Godog, and Testify across seven dimensions, we select **Ginkgo v2 + Gomega** because this combination excels in:
 - **Reliability & Flakiness Prevention**: Gomega's built-in async testing (`Eventually`/`Consistently`) prevents flaky tests in distributed systems
@@ -254,11 +254,11 @@ Validate the complete data flow from API to adapter and back, ensuring framework
    - Expected: Adapter consumes topic within 2 minutes
    - Expected: Adapter reports status back to API
 
-5. **Verify Complete Flow**
+3. **Verify Complete Flow**
    - Poll object status periodically
    - Expected: Object reaches "READY" state within 10 minutes
 
-6. **Verify State Consistency**
+4. **Verify State Consistency**
    - Ensure final state remains stable
    - Expected: State consistently stays "COMPLETED"
 

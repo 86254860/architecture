@@ -51,6 +51,7 @@ The target system comprises the **core Hyperfleet data flow framework**:
 - Provider-specific adapter implementations (validation, DNS, pull-secret adapters, etc.)
 - Provider-specific infrastructure provisioning
 - Multi-provider deployment architecture
+- Test case Markdown format details (refer to the [latest template](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/testcases/template.md); feedback should be tracked in separate tickets)
 
 ### 1.2 Testing Challenges
 
@@ -130,23 +131,12 @@ Eventually(func() string {
 Consistently(func() bool {
     return brokerClient.IsHealthy(ctx)
 }, 2*time.Minute, 5*time.Second).Should(BeTrue())
-```
 
-**Anti-Flakiness Patterns:**
-- **No fixed sleeps**: `Eventually` polls dynamically, adapts to actual system timing
-- **Automatic retry**: Transparent handling of transient failures
-- **Configurable timeouts**: Environment-specific timing without code changes
-- **Idempotent cleanup**: Resources freed even on test failures
-
-```go
+// Idempotent cleanup
 AfterEach(func() {
-    defer GinkgoRecover() // Don't let cleanup failures crash suite
+    defer GinkgoRecover()
     if testObject != nil {
-        _ = apiClient.DeleteObject(testObject.ID) // Ignore errors
-        Eventually(func() bool {
-            _, err := apiClient.GetObject(testObject.ID)
-            return err != nil && IsNotFoundError(err)
-        }, 5*time.Minute).Should(BeTrue())
+        _ = apiClient.DeleteObject(testObject.ID)
     }
 })
 ```
@@ -161,9 +151,6 @@ AfterEach(func() {
 - **High generation accuracy**: LLMs produce correct Ginkgo patterns with minimal context
 
 #### 2.3.3 Test Organization
-
-<summary>Test Organization Patterns (click to expand)</summary>
-
 **Label-based filtering:**
 ```bash
 ginkgo --label-filter="smoke && gcp"      # Smoke tests for GCP
@@ -225,178 +212,39 @@ var _ = Describe("End-to-End Data Flow", Label("E2E-FLOW-001", "critical"), func
 <summary>Complete Ginkgo + Gomega + Markdown Test Example (click to expand)</summary>
 
 **Part 1: Markdown Documentation**
-
-```markdown
-# scenarios/data_flow.md
-
-## Scenario: End-to-End Data Flow Validation
-
-**AI-Sync-ID:** E2E-FLOW-001  
-**Priority:** Critical  
-**Labels:** data-flow, framework, critical
-
-### Purpose
-Validate the complete data flow from API to adapter and back, ensuring framework components work together correctly.
-
-### Prerequisites
-- The Hyperfleet API is available
-- Sentinel is running and polling
-- The message broker is healthy
-- At least one adapter is deployed
-
-### Test Steps
-
-1. **Create Object via API**
-   - Create an object with name "test-object-1" and type "ClusterRequest"
-   - Verify creation succeeds and returns a valid object ID
-
-2. **Verifying adapter reports status back to API**
-   - Expected: Adapter consumes topic within 2 minutes
-   - Expected: Adapter reports status back to API
-
-3. **Verify Complete Flow**
-   - Poll object status periodically
-   - Expected: Object reaches "READY" state within 10 minutes
-
-4. **Verify State Consistency**
-   - Ensure final state remains stable
-   - Expected: State consistently stays "COMPLETED"
-
-### Cleanup
-- Delete the created object
-- Verify deletion completes successfully
-```
+*Refer to the [Test Case Markdown Template](https://github.com/openshift-hyperfleet/hyperfleet-e2e/blob/main/testcases/template.md) for detailed structure.*
 
 **Part 2: Go Test Implementation**
 
 ```go
 // tests/data_flow_test.go
-package tests
-
-import (
-    "context"
-    "time"
-
-    . "github.com/onsi/ginkgo/v2"
-    . "github.com/onsi/gomega"
-    
-    "hyperfleet-e2e/pkg/clients"
-)
-
 // @AI-Sync-ID: E2E-FLOW-001
 var _ = Describe("End-to-End Data Flow Validation", Label("data-flow", "framework", "critical", "E2E-FLOW-001"), func() {
-    var (
-        ctx              context.Context
-        apiClient        *clients.APIClient
-        sentinelClient   *clients.SentinelClient
-        brokerClient     *clients.BrokerClient
-        adapterClient    *clients.AdapterClient
-        createdObjectID  string
-        createdObject    *clients.Object
-    )
+    var ctx context.Context
 
-    // BeforeEach verifies all prerequisites before running tests
     BeforeEach(func() {
         ctx = context.Background()
-        
-        // Initialize clients
-        apiClient = clients.NewAPIClient(cfg.APIEndpoint, cfg.APIToken)
-        sentinelClient = clients.NewSentinelClient(cfg.SentinelEndpoint)
-        brokerClient = clients.NewBrokerClient(cfg.BrokerEndpoint)
-        adapterClient = clients.NewAdapterClient(cfg.AdapterEndpoint)
-        
-        GinkgoWriter.Println("Verifying system prerequisites...")
-        
-        // Verify: Hyperfleet API is available
-        Eventually(func() error {
-            return apiClient.HealthCheck(ctx)
-        }, 30*time.Second, 2*time.Second).Should(Succeed(), "API should be healthy")
-        
-        // Verify: Sentinel is running and polling
-        Eventually(func() bool {
-            status, err := sentinelClient.GetStatus(ctx)
-            return err == nil && status.IsRunning
-        }, 30*time.Second, 2*time.Second).Should(BeTrue(), "Sentinel should be running")
-        
-        // Verify: Message broker is healthy
-        Expect(brokerClient.IsHealthy(ctx)).To(BeTrue(), "Message broker should be healthy")
-        
-        // Verify: At least one adapter is deployed
-        adapters, err := adapterClient.ListAdapters(ctx)
-        Expect(err).NotTo(HaveOccurred(), "Should be able to list adapters")
-        Expect(adapters).NotTo(BeEmpty(), "At least one adapter should be deployed")
-        
-        GinkgoWriter.Println("✓ All prerequisites verified")
+        // Initialize clients and verify prerequisites
     })
 
-    // AfterEach handles cleanup with idempotent operations
     AfterEach(func() {
         defer GinkgoRecover()
-        
-        if createdObjectID != "" {
-            GinkgoWriter.Printf("Cleaning up object: %s\n", createdObjectID)
-            _ = apiClient.DeleteObject(ctx, createdObjectID)
-            
-            // Verify deletion completes successfully
-            Eventually(func() bool {
-                _, err := apiClient.GetObject(ctx, createdObjectID)
-                return err != nil && clients.IsNotFoundError(err)
-            }, 5*time.Minute, 10*time.Second).Should(BeTrue())
-            
-            GinkgoWriter.Println("✓ Cleanup completed")
-        }
+        // Cleanup resources
     })
 
     It("should complete full data flow from API to adapter and back", func() {
         By("creating an object via the API")
-        var err error
-        createdObject, err = apiClient.CreateObject(ctx, &clients.CreateObjectRequest{
+        createdObject, err := apiClient.CreateObject(ctx, &clients.CreateObjectRequest{
             Name: "test-object-1",
             Type: "ClusterRequest",
         })
-        Expect(err).NotTo(HaveOccurred(), "Object creation should succeed")
-        Expect(createdObject).NotTo(BeNil())
-        Expect(createdObject.ID).NotTo(BeEmpty(), "Object should have a valid ID")
-        createdObjectID = createdObject.ID
-        GinkgoWriter.Printf("✓ Created object with ID: %s\n", createdObjectID)
+        Expect(err).NotTo(HaveOccurred())
 
-        By("verifying adapter reports status back to API")
-        Eventually(func() bool {
-            status, err := apiClient.GetObjectStatus(ctx, createdObjectID)
-            if err != nil {
-                GinkgoWriter.Printf("Error getting object status: %v\n", err)
-                return false
-            }
-            return status.LastUpdatedBy == "adapter" && status.State = "Available"
-        }, 2*time.Minute, 10*time.Second).Should(BeTrue(),
-            "Adapter should report status to API")
-
-        // Step 5: Verify complete flow
-        By("polling object status until completion")
+        By("verifying object reaches ready state")
         Eventually(func() string {
-            status, err := apiClient.GetObjectStatus(ctx, createdObjectID)
-            if err != nil {
-                GinkgoWriter.Printf("Error getting object status: %v\n", err)
-                return ""
-            }
-            GinkgoWriter.Printf("Object state: %s (updated: %v)\n", 
-                status.State, status.LastUpdated)
-            return status.State
-        }, 10*time.Minute, 15*time.Second).Should(Equal("READY"),
-            "Object should reach READY state within 10 minutes")
-        GinkgoWriter.Printf("✓ Complete data flow validated for object: %s\n", createdObjectID)
-        
-        // Step 6: Verify state consistency (If needed)
-        By("verifying final state consistency")
-        Consistently(func() string {
-            status, err := apiClient.GetObjectStatus(ctx, createdObjectID)
-            if err != nil {
-                return ""
-            }
-            return status.State
-        }, 30*time.Second, 5*time.Second).Should(Equal("READY"),
-            "Object state should remain stable")
-        GinkgoWriter.Println("✓ Final state is consistent")
+            status, _ := apiClient.GetObjectStatus(ctx, createdObject.ID)
+            return status
+        }, 10*time.Minute, 15*time.Second).Should(Equal("READY"))
     })
 })
 ```
@@ -443,6 +291,177 @@ git checkout release-1.1          # Old tests
 
 ---
 
+## 4. Action Items and Next Steps
+
+This section outlines the implementation roadmap following this spike report. Tasks are organized by phase to ensure systematic framework development and test coverage.
+
+### 4.1 Phase 1: Framework Foundation
+
+#### 4.1.1 Initialize HyperFleet E2E Automation Framework
+**Objective:** Establish the base testing infrastructure with Ginkgo v2 + Gomega.
+
+**Tasks:**
+- Set up project structure (`tests/`, `scenarios/`, `clients/`, `utils/`)
+- Initialize Ginkgo v2 test suite with proper configuration
+- Configure Gomega matchers and async testing primitives
+- Implement shared test fixtures and helper utilities
+- Create environment configuration management (dev, staging, production)
+- Establish logging and reporting mechanisms
+
+**Deliverables:**
+- Runnable test suite skeleton with sample smoke test
+- CI-ready configuration files
+- Documentation for local test execution
+
+#### 4.1.2 Update E2E Testing Image Dockerfile for Optimized Build
+**Objective:** Create containerized test execution environment.
+
+**Tasks:**
+- Design multi-stage Dockerfile for efficient builds
+- Include Ginkgo CLI, Go toolchain, and required dependencies
+- Optimize image layers for CI caching
+- Add health check and entrypoint scripts
+- Configure non-root user for security compliance
+- Set up image versioning and tagging strategy
+
+**Deliverables:**
+- Production-ready Dockerfile with build instructions
+- Container image published to registry
+
+### 4.2 Phase 2: Core Test Implementation
+
+#### 4.2.1 Automate Cluster Creation Test Case with Status Validation
+**Objective:** Validate end-to-end cluster creation flow through the data pipeline.
+
+**Test Coverage:**
+- API accepts cluster creation request and returns valid ID
+- Sentinel detects cluster object and creates broker topic
+- Message broker propagates cluster creation event
+- Adapter consumes event and initiates cluster provisioning
+- Cluster status transitions through expected states (PENDING → PROVISIONING → READY)
+- API reflects accurate status updates from adapter
+
+**Implementation:**
+- Create Markdown test case documentation with AI-Sync-ID
+- Implement Ginkgo test with labels (`cluster`, `critical`, `data-flow`)
+- Use `Eventually` for async status polling with appropriate timeouts
+- Add cleanup logic in `AfterEach` for test isolation
+- Validate error handling for failure scenarios
+
+**Deliverables:**
+- `scenarios/cluster_creation.md` documentation
+- `tests/cluster_creation_test.go` implementation
+- Passing test execution with clean teardown
+
+#### 4.2.2 Automate Nodepool Creation Test Case with Status Validation
+**Objective:** Validate nodepool creation as dependent resource within cluster lifecycle.
+
+**Test Coverage:**
+- Nodepool creation succeeds only after cluster is READY
+- Data flow validation (API → Sentinel → Broker → Adapter → API)
+- Nodepool status transitions (PENDING → CREATING → READY)
+- Nodepool scaling operations (optional Day 2 operation)
+
+**Implementation:**
+- Implement shared `BeforeAll` for cluster creation
+- Test nodepool creation with proper dependency validation
+- Verify broker topic creation for nodepool events
+- Add status validation with configurable timeouts
+
+**Deliverables:**
+- `scenarios/nodepool_creation.md` documentation
+- `tests/nodepool_creation_test.go` implementation
+- Integration with cluster lifecycle tests
+
+### 4.3 Phase 3: CI/CD Integration
+
+#### 4.3.1 Update Prow E2E Testing Step with Real Test Execution
+**Objective:** Integrate E2E tests into Prow CI pipeline for automated validation.
+
+**Tasks:**
+- Configure Prow job definitions for E2E test execution in public repository
+- Set up test environment provisioning in CI
+- Implement label-based test filtering for PR vs. periodic jobs
+- Configure JUnit XML output for Sippy compatibility
+- Add timeout and retry policies for flaky infrastructure
+- Set up test result publishing to Sippy
+- Configure notifications for test failures
+
+**Deliverables:**
+- Prow job configurations for pull requests and periodic runs
+- Test results published to Sippy dashboard
+- JUnit XML artifacts for result analysis
+- Documentation for triggering and debugging CI test failures
+
+#### 4.3.2 Integrate Sippy to Provide Dashboards for the CI Test/Job Data
+**Objective:** Set up Sippy dashboards to visualize E2E test results, track test health, and identify flaky tests.
+
+**Tasks:**
+- Configure Sippy to consume JUnit XML test results from Prow jobs
+- Set up dashboard views for test pass/fail rates and trends
+- Create custom dashboards for Hyperfleet-specific test suites
+- Set up alerts for test health degradation
+- Configure historical data retention and analysis
+- Document dashboard access and interpretation for team members
+
+**Deliverables:**
+- Sippy dashboard displaying Hyperfleet E2E test results
+- Test health metrics and regression tracking
+- User guide for interpreting Sippy dashboards
+- Alert configurations for critical test failures
+
+### 4.4 Phase 4: Documentation Standards and AI Validation
+
+#### 4.4.1 Improve Test Case Documentation Templates
+**Objective:** Standardize test scenario documentation.
+
+**Tasks:**
+- Finalize Markdown template structure
+- Create examples for common test patterns
+- Document AI-Sync-ID conventions and best practices based on the AI sync validation.
+- Provide guidelines for test case authoring
+
+**Deliverables:**
+- Test case template
+- Contribution guidelines for new test cases
+
+#### 4.4.2 Implement AI-Powered Documentation Sync Validation
+**Objective:** Ensure test case Markdown documentation and test code remain synchronized to prevent drift and outdated documentation.
+
+**Tasks:**
+- Develop AI-powered validation tool that:
+  - Scans AI-Sync-ID metadata in both Markdown files and Go test files
+  - Uses LLM to semantically compare test scenarios in docs vs. actual test implementation
+  - Detects mismatches in test steps, assertions, preconditions, and expected outcomes
+  - Identifies orphaned documentation (no matching code) or undocumented tests
+  - Generates detailed drift reports with specific discrepancies
+- Integrate validation into CI pipeline (e.g., presumit hook):
+  - Run validation on every PR that modifies test files or documentation
+  - Block merges if documentation drift exceeds threshold
+  - Provide actionable feedback in PR comments
+- Create auto-sync assistance:
+  - Generate suggested documentation updates when code changes
+  - Propose code updates when documentation is modified
+  - Require human review and approval for all changes
+
+**Deliverables:**
+- AI validation CLI tool with LLM integration
+- CI job configuration for PR-based validation
+- User guide for interpreting validation results and resolving drift
+
+### 4.5 Success Criteria
+
+The E2E testing framework is considered ready for production use when:
+
+- ✅ Framework successfully validates core data flow (API → Sentinel → Broker → Adapter → API)
+- ✅ Cluster and Nodepool creation tests pass consistently (>95% success rate)
+- ✅ Tests execute in CI on every PR with <15 minute runtime for critical suite
+- ✅ Backward compatibility validation catches breaking changes before release
+- ✅ Documentation sync validation prevents drift between specs and code
+- ✅ Team can add new test cases following established patterns
+
+---
+
 ## Appendix A: Detailed Framework Evaluations
 
 This appendix provides detailed assessments of each framework for reference.
@@ -482,9 +501,6 @@ An alternative approach using Ginkgo v2 as the test runner with Godog (Gherkin) 
 # scenarios/data_flow.feature
 @data-flow @framework
 Feature: End-to-End Data Flow Validation
-  As a framework developer
-  I want to validate the complete data flow from API to adapter
-  So that I can ensure framework components work together correctly
 
   @critical @E2E-FLOW-001
   Scenario: Complete data flow for object creation
@@ -492,144 +508,62 @@ Feature: End-to-End Data Flow Validation
     And Sentinel is running and polling
     And the message broker is healthy
     And at least one adapter is deployed
-
-    When I create an object via the API:
-      | field | value          |
-      | name  | test-object-1  |
-      | type  | ClusterRequest |
-    Then I should receive a "202" response
-    And the response should contain a valid object ID
-
-    # Verify Sentinel detects object
-    When I wait for Sentinel to detect the object
-    Then Sentinel should have detected the object within "2 minutes"
-
-    # Verify topic created
-    When I check the message broker
-    Then a topic should exist for the object within "1 minute"
-
-    # Verify adapter consumption
-    When I check adapter state
-    Then the adapter should have consumed the topic within "2 minutes"
-    And the adapter should report status back to API
-
-    # Verify complete flow
-    When I poll the object status every "10 seconds"
+    When I create an object via the API
     Then the object should reach "COMPLETED" state within "10 minutes"
 ```
 
 ```go
-// Firstly, define each step
+// Step 1: Define step implementation
 func (s *DataFlowSteps) theObjectShouldReachStateWithin(expectedState, timeoutStr string) error {
-    ctx := context.Background()
-    apiClient := s.commonSteps.GetAPIClient()
-
     timeout := parseDuration(timeoutStr)
     pollInterval := 10 * time.Second
-
-    fmt.Printf("Waiting for object to reach %s state (timeout: %v)...\n", expectedState, timeout)
-
     startTime := time.Now()
+
     for {
         status, err := apiClient.GetObjectStatus(ctx, s.CreatedObjectID)
         if err == nil && status.State == expectedState {
-            fmt.Printf("✓ Object reached %s state\n", expectedState)
             return nil
         }
-
         if time.Since(startTime) > timeout {
-            currentState := "UNKNOWN"
-            if status != nil {
-                currentState = status.State
-            }
-            return fmt.Errorf("object did not reach %s state within %v (current: %s)",
-                expectedState, timeout, currentState)
+            return fmt.Errorf("timeout waiting for state %s", expectedState)
         }
-
         time.Sleep(pollInterval)
     }
 }
 
-// Secondly, register the steps, which map the content to the step functions
+// Step 2: Register steps - map Gherkin phrases to Go functions
 func (s *DataFlowSteps) RegisterSteps(sc *godog.ScenarioContext) {
-    // Also register common steps
-    s.commonSteps.RegisterSteps(sc)
-    
-    // Object creation steps
-    sc.Step(`^I create an object via the API:$`, s.iCreateAnObjectViaTheAPI)
-    
-    // Sentinel verification steps
-    sc.Step(`^I wait for Sentinel to detect the object$`, s.iWaitForSentinelToDetectTheObject)
-    sc.Step(`^Sentinel should have detected the object within "([^"]*)"$`, s.sentinelShouldHaveDetectedTheObjectWithin)
-    
-    // Broker verification steps
-    sc.Step(`^I check the message broker$`, s.iCheckTheMessageBroker)
-    sc.Step(`^a topic should exist for the object within "([^"]*)"$`, s.aTopicShouldExistForTheObjectWithin)
-    
-    // Adapter verification steps
-    sc.Step(`^the adapter should have consumed the topic within "([^"]*)"$`, s.theAdapterShouldHaveConsumedTheTopicWithin)
-    
-    // Object status steps
-    sc.Step(`^I poll the object status every "([^"]*)"$`, s.iPollTheObjectStatusEvery)
+    sc.Step(`^the Hyperfleet API is available$`, s.theAPIIsAvailable)
+    sc.Step(`^I create an object via the API$`, s.iCreateAnObject)
     sc.Step(`^the object should reach "([^"]*)" state within "([^"]*)"$`, s.theObjectShouldReachStateWithin)
 }
 
-// Thirdly, load all the scenarios, and dynamically creates Describe blocks for each feature
+// Step 3: Load all scenarios and create Ginkgo Describe blocks for each feature
 func registerFeatureTests() {
     scenariosDir := "../scenarios"
+    features, _ := discoverFeatures(scenariosDir)
 
-    // Discover all feature files
-    features, err := discoverFeatures(scenariosDir)
-
-    // Create a Describe block for each feature file with appropriate labels
+    // Create a Describe block for each feature file
     for _, feature := range features {
-        // Capture feature in closure
         f := feature
 
-        // Convert labels to Label() arguments
-        ginkgoLabels := make([]interface{}, len(f.Labels))
-        for i, label := range f.Labels {
-            ginkgoLabels[i] = label
-        }
-
-        // Create Describe block with dynamic labels
-        Describe(f.Name, Label(ginkgoLabels...), func() {
-            var (
-                ctx           context.Context
-                dataFlowSteps *steps.DataFlowSteps
-                commonSteps   *steps.CommonSteps
-            )
+        Describe(f.Name, Label(f.Labels...), func() {
+            var dataFlowSteps *steps.DataFlowSteps
 
             BeforeEach(func() {
-                ctx = context.Background()
-                // Initialize step definition handlers
                 dataFlowSteps = steps.NewDataFlowSteps()
-                commonSteps = steps.NewCommonSteps()
             })
 
-            It("executes feature scenarios from: "+filepath.Base(f.Path), func() {
-                GinkgoWriter.Printf("\nExecuting feature: %s\n", f.Path)
-                GinkgoWriter.Printf("Labels: %v\n", f.Labels)
-
-                // Create Godog test suite for this specific feature
+            It("executes feature scenarios", func() {
+                // Create Godog test suite
                 suite := godog.TestSuite{
                     ScenarioInitializer: func(sc *godog.ScenarioContext) {
-                        // Register all step definitions
+                        // Register step definitions
                         dataFlowSteps.RegisterSteps(sc)
-                        commonSteps.RegisterSteps(sc)
 
-                        // Scenario hooks
-                        sc.Before(func(ctx context.Context, scenario *godog.Scenario) (context.Context, error) {
-                            GinkgoWriter.Printf("\n--- Scenario: %s ---\n", scenario.Name)
-                            return ctx, nil
-                        })
-
+                        // Setup scenario hooks
                         sc.After(func(ctx context.Context, scenario *godog.Scenario, err error) (context.Context, error) {
-                            // Cleanup after each scenario
-                            if dataFlowSteps.CreatedObjectID != "" {
-                                GinkgoWriter.Printf("Cleaning up object: %s\n", dataFlowSteps.CreatedObjectID)
-                                _ = dataFlowSteps.Cleanup(ctx)
-                            }
+                            _ = dataFlowSteps.Cleanup(ctx)
                             return ctx, nil
                         })
                     },
@@ -640,9 +574,8 @@ func registerFeatureTests() {
                     },
                 }
 
-                // Run Godog scenarios
-                status := suite.Run()
-                if status != 0 {
+                // Run Godog scenarios within Ginkgo
+                if status := suite.Run(); status != 0 {
                     Fail("Feature scenarios failed")
                 }
             })
@@ -692,5 +625,6 @@ func registerFeatureTests() {
 - [Bruno](https://github.com/usebruno/bruno/tree/main)
 - [Markdown style test suite example of ty](https://github.com/astral-sh/ruff/blob/main/crates/ty_python_semantic/resources/mdtest/typed_dict.md)
 - [OpenShift E2E Testing Repository](https://github.com/openshift/origin/)
+- [Sippy provides dashboards for the openshift CI test/job data](https://github.com/openshift/sippy)
 
 ---

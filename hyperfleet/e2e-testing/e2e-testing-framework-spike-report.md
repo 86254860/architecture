@@ -439,6 +439,10 @@ Sippy does not support the same type of dashboard as ReportPortal, where you can
 2. **Test-case-level and job-level views**: Allows you to see both aggregated and detailed test results
 3. **Failure Alerts**: For failed jobs/testcases, Sippy has alerts to notify the team via Slack messages
 
+**Recommended Approach for Hyperfleet:**
+
+Consider a temporary hybrid usage of both Sippy and ReportPortal during post-MVP phase to support debugging capabilities, unless a better resolution is identified.
+
 ### 4.6 Success Criteria
 
 The E2E testing framework is considered ready for production use when:

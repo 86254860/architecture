@@ -156,3 +156,113 @@ Some other rules for the API:
 1. Ready transitions to False for every user spec change
       - Since it will increase generation
       - And all adapters being async have observedGeneration<generation
+
+## Next Action items
+
+1. Changes to API spec:
+
+<details>
+<summary>Ticket definition </summary>
+
+  What:
+  Change the API spec to align with the sentinel pulses proposal
+
+  Details:
+
+    - Remove `status.phase`
+    - Defining `Available` and `Ready` as `status.conditions`
+    - Is it possible to define as an array with these two being mandatory?
+    - Create and publish openapi contracts
+    - Version the release
+
+  Acceptance criteria:
+    - New release with openapi contracts for core and GCP
+    - Examples for cluster and nodepools responses
+    - Examples for statuses
+
+</details>
+
+1. Changes to API
+
+<details>
+<summary>Ticket: Change API spec to add Available and Ready resource conditions </summary>
+  What:
+  Change HyperFleet-api to use the new API spec and behave aligned with the new proposal
+
+  Details:
+
+    - Compute `Available` and `Ready` conditions with rules:
+        1. API should only accept conditions statuses for same or increased condition.observed_generation
+            - An adapter update can not replace data from a newer generation
+            - e.g. If validation adapter is at gen=2, API only accepts reports of gen>=2
+        1. API should discard conditions with `Available=Unknown`
+            - It can still store in some status log table/file for tracing
+            - We can think of optimizing by having a post-condition that discards adapter report
+            - It also doesn't update `last_updated_time` for the adapter
+        1. Available only transitions to True
+            - If all the adapters are at the same generation report Available=True
+            - Could be that the adapter's reports observed_generation < generation
+              - This can happen when updating quickly a spec
+              - API will be getting "older" adapter statuses first
+              - It can be "Available"" for that generation, but needs reconciliation
+              - Eventually it will get newer responses
+        1. Available transitions to False
+            - If any adapter of the `observed_generation` in the condition reports `Available=False`
+            - But not for adapters reporting `Available=false` at other `observed_generation`
+            - This keeps `Available=true` for `observed_generation` while `Ready=False`
+              - Meaning, that the last known generation is still marked available
+        1. Ready transitions to False for every user spec change
+              - Since it will increase generation
+              - And all adapters being async have observedGeneration<generation
+
+  Acceptance criteria:
+    - API implements the new spec
+    - Create tests for new conditions what will be always present
+    - Code reviewed and merged
+    - Documentation updated
+    - Related architecture repository documentation updated
+</details>
+
+1. Changes to Sentinel
+
+<details>
+<summary>Ticket: Change Sentinel to evaluate based on resource status.Ready condition  </summary>
+  What:
+  Change Sentinel to use `resource.Ready` property instead of `status.phase`
+
+  Details:
+    - Change openapi version to use the one of the proposal
+    - Evaluate reason to publish using `resource.Ready` property instead of `status.phase`
+
+  Acceptance criteria:
+    - Sentinel no longer uses `status.phase`
+    - Documentation updated
+    - Related architecture repository documentation updated
+
+</details>
+1. Adapter framework
+<details>
+<summary>Ticket: Document in-progress adapter task status report</summary>
+  What: Document how adapters should use the value `Unknown` for reporting in-progress state of the work to be done
+
+  Acceptance criteria:
+    - Document the usage of `Available=Unknown`
+    - Change job template examples to retry indefinitely
+
+</details>
+1. Adapters
+<details>
+<summary>Ticket: Change validation adapter task job to retry indefinitely</summary>
+  What: Change job manifest to keep retrying until success
+
+  Detail:
+    - Change adapter task jobs to retry indefinitely
+      - Set job `restartPolicy: OnFailure`
+      - Set `backoffLimit` to a high number like 1000000
+      - This makes retries 10x2 until 360seconds
+
+  Acceptance criteria:
+    - Jobs for adapter tasks always finish with success or keep retying
+    - Documentation updated
+
+</details>

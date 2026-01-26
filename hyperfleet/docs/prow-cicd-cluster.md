@@ -4,9 +4,20 @@
 
 This is the long-running reserved GKE cluster for Prow CI/CD job execution. This document shows you how to access it, get information about it, update it, and remove it if needed.
 
-- **Cluster Name**: `hyperfleet-dev-prow`  
-- **GCP Project**: `hcm-hyperfleet`  
+- **Cluster Name**: `hyperfleet-dev-prow`
+- **GCP Project**: `hcm-hyperfleet`
 - **Connect Command**: `gcloud container clusters get-credentials hyperfleet-dev-prow --zone us-central1-a --project hcm-hyperfleet`
+
+---
+
+## Usage Policy
+
+**This cluster is dedicated to running Prow CI/CD jobs for the team.**
+
+- **Read-only operations** (viewing cluster info, logs, etc.) can be performed by all team members
+- **Modifications** (updates, deletions, configuration changes) to the cluster or the `prow-hyperfleet` namespace should follow these best practices:
+  1. Get **explicit approval** from team leaders
+  2. Send a **team-wide broadcast via Slack** before taking action to ensure everyone is aware of potential impacts
 
 ---
 
@@ -25,8 +36,8 @@ gcloud components install kubectl gke-gcloud-auth-plugin
 # Install Terraform
 brew install terraform  # Terraform >= 1.5
 
-# Git clone the infrastructure repository hyperfleet-infra
-# Then
+# Clone the infrastructure repository
+git clone https://github.com/openshift-hyperfleet/hyperfleet-infra.git
 cd hyperfleet-infra
 ```
 
@@ -100,6 +111,8 @@ terraform output pubsub_resources
 
 ## How to Update the Cluster
 
+**⚠️ REMINDER**: Review the [Usage Policy](#usage-policy) before proceeding. Leader approval and team-wide Slack broadcast are recommended.
+
 **First, clone the repo if you haven't already** (see [Prerequisites for Terraform Operations](#prerequisites-for-terraform-operations)).
 
 ### 1. Navigate to Terraform Directory
@@ -147,7 +160,7 @@ kubectl get pods -n prow-hyperfleet
 
 ## How to Remove the Cluster
 
-**⚠️ WARNING**: This destroys the entire Prow cluster. Coordinate with the team first!
+**⚠️ WARNING**: This destroys the entire Prow cluster. Review the [Usage Policy](#usage-policy) before proceeding. Leader approval and team-wide Slack coordination are strongly recommended.
 
 **First, clone the repo if you haven't already** (see [Prerequisites for Terraform Operations](#prerequisites-for-terraform-operations)).
 
@@ -207,12 +220,19 @@ gcloud container clusters get-credentials hyperfleet-dev-prow \
   --project hcm-hyperfleet
 ```
 
-### Terraform State Lock
+### Terraform State Lock Issues
+
+**Note**: Terraform automatically locks the state file when using the remote backend (GCS) to prevent concurrent modifications. This is already enabled and working.
+
+If a Terraform operation is interrupted (crashed, network issue, etc.), the lock may remain stuck. To resolve:
 
 ```bash
-# If locked and no one is using it
+# First, confirm no one is currently running terraform operations
+# Then force-unlock using the lock ID from the error message
 terraform force-unlock <LOCK_ID>
 ```
+
+**⚠️ WARNING**: Only use `force-unlock` after confirming no one else is actively running Terraform operations, as this can cause state corruption if multiple people modify state simultaneously.
 
 ---
 

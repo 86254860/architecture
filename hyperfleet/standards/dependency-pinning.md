@@ -1,6 +1,6 @@
 # Dependency and Tool Version Pinning Standard
 
-All HyperFleet repositories MUST use [Bingo](https://github.com/bwplotka/bingo) to pin development tool versions for reproducible builds across all environments.
+All HyperFleet repositories **containing Go code** MUST use [Bingo](https://github.com/bwplotka/bingo) to pin development tool versions for reproducible builds across all environments.
 
 ## Problem
 
@@ -45,9 +45,9 @@ repo-root/
 │   ├── mockgen.sum                   # Dependency checksums
 │   ├── mockgen-v1.6.0                # Compiled binary (gitignored)
 │   │
-│   └── oapi-codegen.mod              # Tool version specification
-│       oapi-codegen.sum              # Dependency checksums
-│       oapi-codegen-v1.12.4          # Compiled binary (gitignored)
+│   ├── oapi-codegen.mod              # Tool version specification
+│   ├── oapi-codegen.sum              # Dependency checksums
+│   └── oapi-codegen-v2.5.0           # Compiled binary (gitignored)
 │
 ├── Makefile                          # MUST include .bingo/Variables.mk
 ├── go.mod                            # Main module (NO tool dependencies)
@@ -71,7 +71,7 @@ Pattern: `<tool-name>-v<version>`
 
 - **Format**: `{tool-name}-v{semantic-version}`
 - **Generated**: Automatically by Bingo
-- **Gitignored**: MUST NOT be committed (pattern `*-v*` in `.gitignore`)
+- **Gitignored**: MUST NOT be committed (pattern `*-v[0-9]*` in `.gitignore`)
 
 #### Variables.mk
 
@@ -97,7 +97,7 @@ bingo init
 bingo get github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
 
 # 4. Update Makefile
-cat >> Makefile <<'EOF'
+grep -q '.bingo/Variables.mk' Makefile || cat >> Makefile <<'EOF'
 include .bingo/Variables.mk
 
 .PHONY: lint
@@ -137,8 +137,8 @@ bingo get github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
 bingo list
 ls .bingo/golangci-lint*  # Should show .mod, .sum, binary
 
-# 3. Add Makefile target
-cat >> Makefile <<'EOF'
+# 3. Add Makefile target (skip if already exists)
+grep -q 'lint.*GOLANGCI_LINT' Makefile || cat >> Makefile <<'EOF'
 .PHONY: lint
 lint: $(GOLANGCI_LINT)
 	$(GOLANGCI_LINT) run ./...
@@ -173,11 +173,11 @@ bingo get -n custom-name github.com/tool/cmd/tool
 | Use Case | Tool | Command |
 |----------|------|---------|
 | **Linting** | golangci-lint | `bingo get github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6` |
-| **Mocks** | mockgen | `bingo get github.com/golang/mock/mockgen@v1.6.0` |
-| **OpenAPI** | oapi-codegen | `bingo get github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4` |
-| **Kubernetes CRDs** | controller-gen | `bingo get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.13.0` |
-| **Protobuf** | protoc-gen-go | `bingo get google.golang.org/protobuf/cmd/protoc-gen-go@latest` |
-| **gRPC** | protoc-gen-go-grpc | `bingo get google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest` |
+| **Mocks** | mockgen | `bingo get go.uber.org/mock/mockgen@v0.5.0` |
+| **OpenAPI** | oapi-codegen | `bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0` |
+| **Kubernetes CRDs** | controller-gen | `bingo get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.20.0` |
+| **Protobuf** | protoc-gen-go | `bingo get google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11` |
+| **gRPC** | protoc-gen-go-grpc | `bingo get google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.78.0` |
 
 ### Makefile Variable Mapping
 
@@ -237,8 +237,8 @@ include .bingo/Variables.mk
 tools-install:
 	@echo "Installing Bingo tools..."
 	bingo get github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
-	bingo get github.com/golang/mock/mockgen@v1.6.0
-	bingo get github.com/deepmap/oapi-codegen/cmd/oapi-codegen@v1.12.4
+	bingo get go.uber.org/mock/mockgen@v0.5.0
+	bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
 	@echo "Tools installed successfully!"
 
 # List installed tools
@@ -251,8 +251,8 @@ tools-list:
 tools-update:
 	@echo "Updating tools to latest versions..."
 	bingo get github.com/golangci/golangci-lint/cmd/golangci-lint
-	bingo get github.com/golang/mock/mockgen
-	bingo get github.com/deepmap/oapi-codegen/cmd/oapi-codegen
+	bingo get go.uber.org/mock/mockgen
+	bingo get github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 	@echo "Tools updated!"
 
 # Use tools in standard targets
@@ -314,16 +314,16 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: 'go.mod'
           cache: true
 
       # Cache Bingo tools
       - uses: actions/cache@v4
         with:
           path: .bingo
-          key: ${{ runner.os }}-bingo-${{ hashFiles('.bingo/*.mod') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bingo-${{ hashFiles('.bingo/*.mod') }}
           restore-keys: |
-            ${{ runner.os }}-bingo-
+            ${{ runner.os }}-${{ runner.arch }}-bingo-
 
       - name: Run linter
         run: make lint  # Bingo auto-builds tool
@@ -335,7 +335,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Run tests
@@ -348,19 +348,24 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: 'go.mod'
           cache: true
 
       - uses: actions/cache@v4
         with:
           path: .bingo
-          key: ${{ runner.os }}-bingo-${{ hashFiles('.bingo/*.mod') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bingo-${{ hashFiles('.bingo/*.mod') }}
 
       - name: Regenerate code
         run: make generate
 
       - name: Check for changes
-        run: git diff --exit-code  # Fail if generated code is stale
+        run: |
+            if ! git diff --exit-code; then
+                echo "::error::Generated code is out of sync. Run 'make generate' locally and commit the changes."
+                git diff --stat
+                exit 1
+          fi        
 ```
 
 **Key points**:
@@ -376,8 +381,8 @@ jobs:
 ### .bingo/.gitignore
 
 ```gitignore
-# Ignore compiled tool binaries
-*-v*
+# Ignore compiled tool binaries (Bingo format: tool-name-v1.2.3)
+*-v[0-9]*
 
 # Keep module definitions
 !*.mod
@@ -402,9 +407,15 @@ See [CI Integration Pattern](#ci-integration-pattern) for complete GitHub Action
 
 ## References
 
-### Bingo Documentation
+### Documentation
 - [Bingo GitHub](https://github.com/bwplotka/bingo)
 - [Bingo Blog Post](https://www.bwplotka.dev/2020/bingo/)
+- [gomock](https://github.com/golang/mock#gomock)
+- [grpc-go releases](https://github.com/grpc/grpc-go/releases)
+- [protobuf-go releases](https://github.com/protocolbuffers/protobuf-go/releases)
+- [oapi-codegen releases](https://github.com/oapi-codegen/oapi-codegen/releases)
+- [controller-tools releases](https://github.com/kubernetes-sigs/controller-tools/releases)
+
 
 ### Related HyperFleet Standards
 - [Linting Standard](linting.md) - Uses Bingo for golangci-lint

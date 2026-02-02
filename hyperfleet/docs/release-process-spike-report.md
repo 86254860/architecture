@@ -1,7 +1,8 @@
 # HyperFleet Release Process - Spike Report
 
-**Document Status:** Draft  
+**Document Status:** Draft
 **Date:** 2026-01-29
+**Last Updated:** 2026-02-02
 
 ---
 
@@ -10,7 +11,7 @@
 This spike report defines a comprehensive release process for HyperFleet (API service, Sentinel, and Adapter Framework). The proposed process balances agility with stability, leveraging existing Prow infrastructure while establishing clear gates, workflows, and artifacts for production releases.
 
 **Key Recommendations:**
-- **Hybrid release cadence:** Regular 6-week (2-sprint) releases for quality + ad-hoc releases for urgent requirements
+- **Hybrid release cadence:** Regular 3-week (1-sprint) releases for quality + ad-hoc releases for urgent requirements
 - Git branching strategy with release branches and cherry-pick workflow
 - Multi-gate release readiness criteria including automated and manual validation
 - Structured bug triage workflow post-code freeze
@@ -105,21 +106,24 @@ release-X.Y (maintained post-release)
 
 ### 2.2 Timeline and Freeze Process
 
-**Sprint-Based Release Cycle (6 weeks / 2 sprints):**
+**Sprint-Based Release Cycle (3 weeks / 1 sprint):**
 
 **Timeline Breakdown:**
-- **Weeks 1-4 (Development Phase):** Active feature development, normal PR process on `main` branch
-- **Week 5 (Stabilization Phase):**
-  - Feature Freeze - create `release-X.Y` branch
-  - Bug fixes and documentation updates
-  - First Release Candidate (RC.1)
-  - Initial testing (automated + manual)
-  - `main` branch reopens for next release development
-- **Week 6 (Release Phase):**
-  - Code Freeze - only critical fixes with Release Owner approval
-  - Additional RC builds if needed (RC.2, RC.3)
+- **Weeks 1-2 (Development Phase):** Active feature development, normal PR process on `main` branch
+  - Continuous testing on all PRs (unit, integration, linting)
+  - Documentation written alongside code
+  - Features merged as they're completed
+- **Week 3 (Stabilization & Release Phase):**
+  - Feature Freeze - create `release-X.Y` branch, cut RC.1
+  - `main` branch reopens immediately for next release development
+  - Bug fixes cherry-picked from `main`
+  - Full E2E test suite execution (automated + manual)
+  - Documentation finalization
+  - Code Freeze - only critical/blocker fixes with Release Owner approval
   - Final validation and sign-off
-  - GA release tagged and published
+  - GA release tagged and published with all artifacts
+
+**Note:** This 3-week cadence is designed for HyperFleet as a new product requiring rapid feedback cycles with pillar teams. Since CI/CD automation is currently being built, the Stabilization & Release Phase (Week 3) may take longer in the initial releases. As the product matures and automation capabilities improve, the team should continuously refine and optimize the release cadence based on actual data and lessons learned from each release cycle.
 
 ### 2.3 Code Freeze Mechanics
 
@@ -160,11 +164,28 @@ git push origin v1.5.0-rc.1
 
 ### 2.4 Release Branch Maintenance
 
-**Support Policy:** N-2 OR 6 months (whichever is longer)
-- Minimum: Support current + 2 previous releases (e.g., v1.7, v1.6, v1.5)
-- Extended: If a release is < 6 months old, continue supporting it
-- Backport security fixes (CRITICAL/HIGH) to all supported releases
-- Publish patch releases as needed (e.g., v1.5.1, v1.5.2)
+**Support Policy:** 6 months with lifecycle stages
+
+Every release receives 6 months of support from its GA date, divided into two phases:
+
+#### Phase 1: Full Support (first 3 months)
+- All bug fixes and enhancements
+- Patch releases for any severity (Major+)
+- Active maintenance
+
+#### Phase 2: Security Maintenance (months 3-6)
+- CRITICAL and HIGH security vulnerabilities only
+- Blocker bugs affecting production stability
+- Limited patch releases
+
+#### After 6 months: End of Life (EOL)
+- No further updates
+- Users must upgrade to supported version
+
+#### Backport Decision Tree:
+- Version < 3 months old: Backport all Major+ severity bugs
+- Version 3-6 months old: Backport only CRITICAL/HIGH CVEs and Blockers
+- Version > 6 months old: EOL, no backports
 
 ---
 
@@ -206,7 +227,7 @@ Before declaring a release as "GA-Ready", all the following criteria must be sat
 **Operational Documentation:**
 - ✓ Installation guide updated
 - ✓ Upgrade instructions complete (N-1 → N)
-- ✓ Rollback procedure documented
+- ✓ Rollback procedure (if required) documented
 - ✓ Deployment runbook created and reviewed
 
 **Technical Documentation:**
@@ -280,10 +301,13 @@ When a bug is discovered after code freeze (during RC testing or late in release
 5. **Regression Testing:** Full test suite re-run
 6. **Time Box:** If fix takes > 24 hours, consider release delay or degrading severity
 
-**For Major bugs - Release Owner Decision:**
-- Evaluate impact, risk, and workarounds
-- If fixable with low risk → Fix and include in release
-- If high risk or complex → Defer to patch release, document as known issue
+**For Major bugs:**
+1. **Mandatory Fix Required:** Major severity bugs must be fixed before GA release
+2. **Release Owner Assessment:** Evaluate impact, risk, complexity, and timeline
+3. **Fix & Include:** Implement fix and cherry-pick to release branch
+4. **If Not Fixable in Timeline:**
+   - Consider release delay to allow fix completion
+   - OR downgrade severity if impact assessment justifies (requires stakeholder approval and documented rationale)
 
 **For Normal/Minor bugs:**
 - Default: Defer to next patch release or next minor release
@@ -318,14 +342,14 @@ For bugs discovered after GA release:
 
 ```bash
 # Create hotfix branch from release tag
-git checkout -b hotfix/v1.5.1 v1.5.0
+git checkout -b hotfix-1.5.1 v1.5.0
 
 # Make fix, test, commit
 git commit -m "Fix critical bug in Sentinel component"
 
 # Merge to release branch
 git checkout release-1.5
-git merge --no-ff hotfix/v1.5.1
+git merge --no-ff hotfix-1.5.1
 
 # Tag patch release
 git tag -a v1.5.1 -m "Patch release v1.5.1"
@@ -344,15 +368,21 @@ git cherry-pick <commit-sha>
 
 ## 5. Release Cadence
 
-**Regular Releases:** Every 6 weeks (2 sprints) - ~8 releases per year
-- Weeks 1-4: Active development
-- Week 5: Feature freeze, testing, RC.1
-- Week 6: Code freeze, final validation, GA
+**Regular Releases:** Every 3 weeks (1 sprint) - ~17 releases per year
+- Weeks 1-2: Active development
+- Week 3: Feature freeze, stabilization, testing, GA release
+  - Note: Duration may vary as CI/CD automation is being built
 
 **Ad-Hoc Releases:** As needed for urgent requirements (3-5 days)
 - Triggers: Critical bugs, security vulnerabilities, urgent business needs
 - Reduced testing scope (unit, integration, E2E for affected components only)
 - Release Owner approval required
+
+**Cadence Refinement:**
+As HyperFleet matures and based on retrospective data, the team may adjust the release cadence:
+- If automation is strong and quality metrics support it, consider faster cycles
+- If team coordination or integration complexity requires it, consider extending to 4 weeks
+- Revisit cadence after every several releases during retrospectives
 
 ---
 
@@ -396,16 +426,13 @@ A dedicated release repository serves as the single source of truth for all Hype
 
 **Helm Charts:**
 - Each component has its own Helm chart in component repositories
+  - Note: Adapter Framework base chart is designed for overlay usage by business adapters, not standalone deployment
 - Chart version matches component version
 - Note: Umbrella chart strategy (hyperfleet-chart repo) is under discussion
 
-**Adapter Framework Deployment:**
-- Adapter Framework is not deployed standalone via Helm
-- Deployed when specific business adapter is installed (uses specific adapter-framework image)
-
 **Git Tags:**
 - Git tags created in component repositories: `vX.Y.Z`
-- Tags created in `openshift-hyperfleet/releases` repository for unified tracking
+- Unified release tag created in `openshift-hyperfleet/releases` repository (single source of truth for the complete HyperFleet release across all components - see Section 6.0)
 - GitHub Releases created from tags with release notes
 
 ### 6.2 Documentation Deliverables
@@ -474,14 +501,15 @@ Link to upgrade guide
 - Prerequisites (Kubernetes version, permissions, dependencies)
 - Fresh installation steps
 - Upgrade path from N-1 version
-- Rollback procedure
+- Adapter Framework: Deployment via business adapter overlay (not standalone)
+- Rollback procedure if required
 - Post-installation validation steps
 - Troubleshooting common issues
 
 **Checklist:**
 - [ ] Installation guide updated
 - [ ] Upgrade path tested (N-1 → N)
-- [ ] Rollback procedure tested
+- [ ] Rollback procedure (if required) tested
 - [ ] Screenshots/examples updated
 - [ ] Published to documentation site
 
@@ -676,12 +704,13 @@ Based on retrospective findings and Konflux capabilities:
 ### 8.3 Success Metrics
 
 **Track and review quarterly:**
-- Release frequency (target: 8 releases/year)
-- Code freeze duration (target: < 2 weeks)
+- Release frequency (target: ~17 releases/year with 3-week cadence)
+- Code freeze duration (target: < 1 week, ideally 3-4 days)
 - Hotfix frequency (target: < 2 per minor release)
 - Bug escape rate (bugs found post-GA)
 - On-time delivery (target: > 80%)
 - Mean time to patch critical vulnerabilities (target: < 48 hours)
+- Stabilization phase variance (track actual vs. planned to inform process improvements)
 
 ---
 
@@ -729,10 +758,13 @@ Based on retrospective findings and Konflux capabilities:
 ```markdown
 # Release v1.5.0 Tracking Issue
 
-## Timeline
-- Feature Freeze: April 14, 2026
-- Code Freeze: April 28, 2026
-- GA Target: May 12, 2026
+## Timeline (3-week sprint cycle)
+- Sprint Start: YYYY-MM-DD
+- Feature Freeze: YYYY-MM-DD
+- Code Freeze: YYYY-MM-DD
+- GA Target: YYYY-MM-DD
+
+**Note:** Dates may shift based on stabilization phase needs as automation is being built.
 
 ## Release Owner
 @username
@@ -742,24 +774,25 @@ Based on retrospective findings and Konflux capabilities:
 - [ ] E2E tests passing
 - [ ] No Blocker/Critical/Major bugs
 - [ ] Documentation complete
-- [ ] GCP team sign-off
+- [ ] Pillar team sign-off
 
 ## Release Candidates
-- [ ] v1.5.0-rc.1 (May 1)
-- [ ] v1.5.0-rc.2 (May 5, if needed)
-- [ ] v1.5.0-rc.3 (May 8, if needed)
+- [ ] v1.5.0-rc.1 (April 15, at Feature Freeze)
+- [ ] v1.5.0-rc.2 (April 16-17, if needed)
+- [ ] v1.5.0-rc.3 (April 18, if needed)
 
 ## Blockers
 - None currently
 
 ## Communication
 - [ ] Release notes drafted
-- [ ] Stakeholders notified (T-2 weeks)
+- [ ] Stakeholders notified (T-1 week)
 - [ ] Release announcement prepared
 
 ## Post-Release
 - [ ] Retrospective scheduled
 - [ ] Metrics collected
+- [ ] Stabilization phase variance documented
 ```
 
 ### Appendix D: Template - Ad-Hoc Release Request
@@ -828,7 +861,7 @@ What testing will be deferred to next regular release?
 - [ ] Cross-browser testing
 - [ ] Other: [specify]
 
-## Rollback Plan
+## Rollback Plan If Required
 How will we rollback if issues are discovered?
 
 - Rollback procedure: [describe]

@@ -38,16 +38,13 @@ These criteria determine when the development team can initiate the release proc
 
 ### 1.2 Testing & Quality Gates
 
-**CI/CD Pipeline Health:**
-- ✓ Prow CI pipeline is green for all components on the main branch, validating:
-
-  **Testing:**
+- **CI/CD Pipeline Health:** Prow CI pipeline is green for all components on the main branch, validating:
   - Unit tests: ≥70% coverage for new code
   - Integration tests: Passing consistently
   - E2E tests: Critical user journeys validated
   - Performance regression tests: No degradation >10% vs. previous release
 
-  **Build:**
+- **Build**:
   - Container images: Build successfully for all target architectures
   - Helm charts: Package without errors
 
@@ -205,12 +202,83 @@ HyperFleet v1.5.0:
 ```
 
 **Rationale:**
-- Simplifies user experience: "Install HyperFleet v1.5.0" (not "API v1.5 + Sentinel v1.3 + Adapter v2.0")
+- Simplifies user experience: "Install HyperFleet v1.5.0" (not "API v1.5 + Sentinel v1.3 + Adapter v1.4")
 - All components tested together as a validated configuration
 - Clear compatibility matrix and simplified support
 - Components are tightly integrated, designed to work together
 
 **Note:** Business adapters (built on Adapter Framework) may use independent versioning based on their specific needs.
+
+#### 2.5.1 Branching and Tagging Rules
+
+**Key Principles:**
+1. **Branches:** Only components with code changes need new CLM release branches (e.g., `release-1.5`)
+2. **Tags:** ALL components MUST have ALL CLM release version tags (e.g., `v1.5.0`), regardless of code changes
+3. **Important:** A component might not have all CLM release branches, but it MUST have all CLM release tags
+
+**Why?** Release branches are for stabilization work (only needed when code changes); tags represent the validated release configuration (all components must be tagged to indicate they're part of the tested release set).
+
+#### 2.5.2 Practical Example: HyperFleet v1.5.0 Release
+
+**Scenario:**
+- API Service: **Has changes**
+- Sentinel: **Has changes**
+- Adapter Framework: **No code changes**
+
+**At Feature Freeze - Create CLM Release Branches (Only for Changed Components):**
+
+```bash
+# API Service - HAS CHANGES → Create CLM release branch
+cd openshift-hyperfleet/api-service
+git checkout -b release-1.5 && git push origin release-1.5
+
+# Sentinel - HAS CHANGES → Create CLM release branch
+cd openshift-hyperfleet/sentinel
+git checkout -b release-1.5 && git push origin release-1.5
+
+# Adapter Framework - NO CHANGES → No new branch needed
+# (continues using release-1.4 CLM branch from v1.4.0 release)
+```
+
+**At GA Release - Tag ALL Components with Unified Version:**
+
+```bash
+# API Service - Tag v1.5.0 from release-1.5 CLM branch
+cd openshift-hyperfleet/api-service
+git checkout release-1.5
+git tag -a v1.5.0 -m "HyperFleet v1.5.0 GA"
+git push origin v1.5.0
+
+# Sentinel - Tag v1.5.0 from release-1.5 CLM branch
+cd openshift-hyperfleet/sentinel
+git checkout release-1.5
+git tag -a v1.5.0 -m "HyperFleet v1.5.0 GA"
+git push origin v1.5.0
+
+# Adapter Framework - Tag v1.5.0 from release-1.4 CLM branch
+cd openshift-hyperfleet/adapter-framework
+git checkout release-1.4  # Reuse existing CLM branch
+git tag -a v1.5.0 -m "HyperFleet v1.5.0 GA - No code changes"
+git push origin v1.5.0
+```
+
+**Result:**
+```text
+CLM Release Branches (components may have gaps):
+- api-service: release-1.5
+- sentinel: release-1.4, release-1.5
+- adapter-framework: release-1.4 (no release-1.5 since no changes)
+
+Version Tags (all components have all releases):
+- api-service: v1.4.0, v1.5.0
+- sentinel: v1.4.0, v1.5.0
+- adapter-framework: v1.4.0, v1.5.0 (both tags point to same code)
+
+Container Images:
+- registry.ci.openshift.org/hyperfleet/api-service:v1.5.0 (new build)
+- registry.ci.openshift.org/hyperfleet/sentinel:v1.5.0 (new build)
+- registry.ci.openshift.org/hyperfleet/adapter-framework:v1.5.0 (re-tagged)
+```
 
 ---
 

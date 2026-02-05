@@ -38,22 +38,26 @@ These criteria determine when the development team can initiate the release proc
 
 ### 1.2 Testing & Quality Gates
 
-**Automated Test Passed:**
-- ✓ Unit test coverage meets minimum threshold (recommended: 70% for new code)
-- ✓ Integration tests pass consistently for all components
-- ✓ Automated E2E test suite exists and passes for critical user journeys
-- ✓ Performance regression tests show no degradation vs. previous release
+**CI/CD Pipeline Health:**
+- ✓ Prow CI pipeline is green for all components on the main branch, validating:
 
-**Build & CI Health:**
-- ✓ Prow CI pipeline is green for all components on the main branch
-- ✓ Container images build successfully for all target architectures
+  **Testing:**
+  - Unit tests: ≥70% coverage for new code
+  - Integration tests: Passing consistently
+  - E2E tests: Critical user journeys validated
+  - Performance regression tests: No degradation >10% vs. previous release
+
+  **Build:**
+  - Container images: Build successfully for all target architectures
+  - Helm charts: Package without errors
 
 ### 1.3 Cross-Component Dependencies
 
 **Version Compatibility:**
-- ✓ API service, Sentinel, and Adapter Framework version compatibility matrix is documented
+- ✓ All core components use unified versioning (same version number per release - see Section 2.5)
+- ✓ HyperFleet vX.Y.Z components are validated to work together as a tested set
 - ✓ Breaking changes (if any) are documented with migration guides
-- ✓ Backward compatibility requirements are met (recommend N-1 version support)
+- ✓ Backward compatibility: HyperFleet vX.Y.Z supports N-1 version upgrade paths (e.g., v1.5.0 → v1.6.0)
 
 ### 1.4 Documentation Readiness
 
@@ -78,7 +82,7 @@ These criteria determine when the development team can initiate the release proc
 HyperFleet follows a **release branch workflow** based on Kubernetes and OpenShift best practices:
 
 ```text
-main (development)
+main (development branch)
   │
   │ Active Development Phase
   │
@@ -88,19 +92,19 @@ main (development)
   │      │
   │      │ Code Freeze (critical fixes only)
   │      │
-  │      ├─── vX.Y.0-rc.1 (Release Candidate 1)
-  │      ├─── vX.Y.0-rc.2 (Release Candidate 2 - if needed)
-  │      └─── vX.Y.0 (GA Release)
+  │      ├─── vX.Y.0-rc.1 (tag - Release Candidate 1)
+  │      ├─── vX.Y.0-rc.2 (tag - Release Candidate 2, if needed)
+  │      └─── vX.Y.0 (tag - GA Release)
   │
   │ (main branch continues with X.Y+1 development)
   │
   └─── (next release cycle)
 
 After GA:
-release-X.Y (maintained post-release)
+release-X.Y (branch maintained post-release)
   │
-  ├─── vX.Y.1 (Patch release via cherry-picks)
-  ├─── vX.Y.2 (Patch release)
+  ├─── vX.Y.1 (tag - Patch release via cherry-picks)
+  ├─── vX.Y.2 (tag - Patch release)
   └─── ... (support window: 6 months)
 ```
 
@@ -146,9 +150,9 @@ git push origin v1.5.0-rc.1
 - Release Owner reviews and approves all PRs to release branch
 
 **Code Freeze:**
-- Only critical bug fixes allowed into release branch
+- Only Critical or above bug fixes allowed into release branch (Blocker, Critical)
 - Each fix requires:
-  - Bug severity: Major or above (Blocker, Critical, Major)
+  - Bug severity: Critical or above (Blocker, Critical)
   - Release Owner approval
   - Successful test run in Prow
   - Risk assessment documented
@@ -187,6 +191,27 @@ Every release receives 6 months of support from its GA date, divided into two ph
 - Version 3-6 months old: Backport only CRITICAL/HIGH CVEs and Blockers
 - Version > 6 months old: EOL, no backports
 
+### 2.5 Versioning Strategy
+
+**HyperFleet uses unified versioning** following the OpenShift model.
+
+All core components (API Service, Sentinel, Adapter Framework) share the same version number for each release.
+
+```text
+HyperFleet v1.5.0:
+- api-service:v1.5.0
+- sentinel:v1.5.0
+- adapter-framework:v1.5.0
+```
+
+**Rationale:**
+- Simplifies user experience: "Install HyperFleet v1.5.0" (not "API v1.5 + Sentinel v1.3 + Adapter v2.0")
+- All components tested together as a validated configuration
+- Clear compatibility matrix and simplified support
+- Components are tightly integrated, designed to work together
+
+**Note:** Business adapters (built on Adapter Framework) may use independent versioning based on their specific needs.
+
 ---
 
 ## 3. Release Readiness Criteria
@@ -203,7 +228,6 @@ Before declaring a release as "GA-Ready", all the following criteria must be sat
 - ✓ Critical user workflows validated (E2E test suite)
 - ✓ Backward compatibility testing with N-1 version
 - ✓ Installation/upgrade path tested
-- ✓ Rollback procedure tested if required
 
 **Performance & Load Testing:**
 - ✓ Performance benchmarks show no regression > 10% vs. previous release
@@ -214,8 +238,9 @@ Before declaring a release as "GA-Ready", all the following criteria must be sat
 
 ### 3.2 Bug Severity Gates (Mandatory)
 
-- ✓ No open bugs with severity **Major** or above (Blocker, Critical, Major)
-- ✓ Normal and Minor bugs: No gate, tracked for future releases
+- ✓ No open bugs with severity **Normal** or above (Blocker, Critical, Major, Normal)
+    - Note: `Normal` bugs do not gate **MVP releases**
+- ✓ Minor bugs:  No gate, tracked for future releases
 
 ### 3.3 Documentation Completeness (Mandatory)
 
@@ -227,7 +252,6 @@ Before declaring a release as "GA-Ready", all the following criteria must be sat
 **Operational Documentation:**
 - ✓ Installation guide updated
 - ✓ Upgrade instructions complete (N-1 → N)
-- ✓ Rollback procedure (if required) documented
 - ✓ Deployment runbook created and reviewed
 
 **Technical Documentation:**
@@ -302,12 +326,15 @@ When a bug is discovered after code freeze (during RC testing or late in release
 6. **Time Box:** If fix takes > 24 hours, consider release delay or degrading severity
 
 **For Major bugs:**
-1. **Mandatory Fix Required:** Major severity bugs must be fixed before GA release
-2. **Release Owner Assessment:** Evaluate impact, risk, complexity, and timeline
-3. **Fix & Include:** Implement fix and cherry-pick to release branch
-4. **If Not Fixable in Timeline:**
-   - Consider release delay to allow fix completion
-   - OR downgrade severity if impact assessment justifies (requires stakeholder approval and documented rationale)
+1. **Before Code Freeze:** Major severity bugs must be fixed before GA release
+   - **Release Owner Assessment:** Evaluate impact, risk, complexity, and timeline
+   - **Fix & Include:** Implement fix and cherry-pick to release branch
+   - **If Not Fixable in Timeline:**
+     - Consider release delay to allow fix completion
+     - OR downgrade severity if impact assessment justifies (requires stakeholder approval and documented rationale)
+2. **During Code Freeze:** Major bugs must be either:
+   - **Escalated to Critical:** With documented justification showing blocker-level impact to be included in the release
+   - **Deferred to Next Patch:** Scheduled for the next patch release (e.g., v1.5.1) if impact does not warrant Critical escalation
 
 **For Normal/Minor bugs:**
 - Default: Defer to next patch release or next minor release
@@ -364,6 +391,42 @@ git cherry-pick <commit-sha>
 - Blocker/Critical severity: Patch release within 48 hours
 - Major severity: Patch release within 1 week
 
+### 4.5 Release Recovery Strategy
+
+**HyperFleet uses a roll-forward recovery strategy for MVP releases.**
+
+#### 4.5.1 Roll-Forward (Primary Strategy)
+
+When issues are discovered in a GA release, the default recovery path is to **fix forward** via a patch release:
+
+**Process:**
+1. Identify and fix the issue in `main` branch
+2. Cherry-pick fix to affected release branch
+3. Cut patch release (e.g., v1.5.0 → v1.5.1)
+4. Deploy patch following standard deployment procedures
+
+**Timeline:**
+- Blocker/Critical: Patch release within 48 hours
+- Major: Patch release within 1 week
+
+**Advantages:**
+- Simpler testing scope (only test the fix)
+- No database migration reversal complexity
+- Maintains forward version progression
+- Faster response for critical issues
+
+#### 4.5.2 Rollback Support (Post-MVP)
+
+**Status:** Deferred to Post-Q1 (separate epic required)
+
+**Reference:** See [versioning trade-offs documentation](https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/docs/versioning-trade-offs.md#4-database-migration-and-rollback-procedures-post-mvp) for detailed rollback considerations.
+
+**Decision Point:** Evaluate rollback support necessity after MVP based on:
+- Incident frequency and severity
+- Customer requirements for rollback capabilities
+- Database schema stability
+- Testing infrastructure maturity
+
 ---
 
 ## 5. Release Cadence
@@ -419,10 +482,16 @@ A dedicated release repository serves as the single source of truth for all Hype
 **Container Images:**
 - Built automatically by Prow on release tag creation
 - Published to `registry.ci.openshift.org/hyperfleet/*`
-- Image naming: `registry.ci.openshift.org/hyperfleet/{component}:v{version}`
-  - api-service:v1.5.0
-  - sentinel:v1.5.0
-  - adapter-framework:v1.5.0
+- **Image naming:** All components use unified HyperFleet version
+  ```text
+  registry.ci.openshift.org/hyperfleet/{component}:v{hyperfleet-version}
+  ```
+- **Example for HyperFleet v1.5.0 release:**
+  - `registry.ci.openshift.org/hyperfleet/api-service:v1.5.0`
+  - `registry.ci.openshift.org/hyperfleet/sentinel:v1.5.0`
+  - `registry.ci.openshift.org/hyperfleet/adapter-framework:v1.5.0`
+
+  (All components share the same version number per Section 2.5)
 
 **Helm Charts:**
 - Each component has its own Helm chart in component repositories
@@ -471,16 +540,25 @@ Brief description of release theme and major highlights
 Link to upgrade guide
 
 ## Compatibility Matrix
-| Component | Version | Compatible Kubernetes |
-|-----------|---------|----------------------|
-| API Service | 1.5.0 | 1.26-1.30 |
-| Sentinel | 1.5.0 | 1.26-1.30 |
-| Adapter Framework | 1.5.0 | 1.26-1.30 |
+
+**HyperFleet v1.5.0** (unified version for all core components)
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| API Service | v1.5.0 | New GitOps integration, OAuth 2.1 support |
+| Sentinel | v1.5.0 | Memory leak fix, performance improvements |
+| Adapter Framework | v1.5.0 | Dependency updates, no functional changes |
+
+**Platform Compatibility:**
+
+| Platform | Supported Versions |
+|----------|-------------------|
+| Kubernetes | 1.26 - 1.30 |
+| Helm | 3.14+ |
 
 ## Dependency Versions
 - Go: 1.25
 - Base image: gcr.io/distroless/static-debian12:nonroot
-- Helm: 3.14+
 
 ## Security
 - CVEs addressed in this release
@@ -502,14 +580,12 @@ Link to upgrade guide
 - Fresh installation steps
 - Upgrade path from N-1 version
 - Adapter Framework: Deployment via business adapter overlay (not standalone)
-- Rollback procedure if required
 - Post-installation validation steps
 - Troubleshooting common issues
 
 **Checklist:**
 - [ ] Installation guide updated
 - [ ] Upgrade path tested (N-1 → N)
-- [ ] Rollback procedure (if required) tested
 - [ ] Screenshots/examples updated
 - [ ] Published to documentation site
 
@@ -722,6 +798,7 @@ Based on retrospective findings and Konflux capabilities:
 - [Kubernetes Release Cycle](https://kubernetes.io/releases/release/)
 - [Kubernetes Release Cadence](https://goteleport.com/blog/kubernetes-release-cycle/)
 - [Patch Releases | Kubernetes](https://kubernetes.io/releases/patch-releases/)
+- [Kubernetes Branch](https://github.com/kubernetes/kubernetes/branches)
 
 **Konflux CI/CD:**
 - [Why Konflux?](https://konflux-ci.dev/docs/)
@@ -833,9 +910,9 @@ List what is NOT included to keep scope tight:
 - [ ] Adapter Framework - [changes description]
 
 ### Risk Level
-- [ ] Low - Minor change, well-tested, easy rollback
+- [ ] Low - Minor change, well-tested, quick patch if needed
 - [ ] Medium - Moderate change, some risk
-- [ ] High - Significant change, complex rollback
+- [ ] High - Significant change, complex fix-forward required
 
 ### Blast Radius
 - Number of users/environments affected: [estimate]
@@ -858,15 +935,18 @@ List what is NOT included to keep scope tight:
 What testing will be deferred to next regular release?
 - [ ] Full exploratory testing
 - [ ] Performance regression testing
-- [ ] Cross-browser testing
 - [ ] Other: [specify]
 
-## Rollback Plan If Required
-How will we rollback if issues are discovered?
+## Recovery Plan
+**Primary strategy: Roll-forward via patch release (MVP approach)**
 
-- Rollback procedure: [describe]
-- Rollback testing: [ ] Tested / [ ] Not tested
-- Data migration concerns: [yes/no, describe]
+### If Issues Discovered
+- [ ] Hotfix patch release plan documented
+- [ ] Fix timeline estimated (target: < 48 hours for critical)
+- [ ] Workaround available for users (if applicable)
+
+### Database Migration Considerations
+- [ ] Schema changes included? [yes/no]
 
 ## Stakeholder Coordination
 

@@ -2,7 +2,7 @@
 
 **Document Status:** Draft
 **Date:** 2026-01-29
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-10
 
 ---
 
@@ -13,6 +13,8 @@ This spike report defines a comprehensive release process for HyperFleet (API se
 **Key Recommendations:**
 - **Hybrid release cadence:** Regular 3-week (1-sprint) releases for quality + ad-hoc releases for urgent requirements
 - Git branching strategy with release branches and cherry-pick workflow
+- **Independent component versioning:** Each component (API Service, Sentinel, Adapter Framework) maintains its own semantic version
+- Validated HyperFleet releases defined by compatibility-tested component version combinations
 - Multi-gate release readiness criteria including automated and manual validation
 - Structured bug triage workflow post-code freeze
 - Comprehensive release artifacts including container images, Helm charts, and documentation
@@ -51,10 +53,12 @@ These criteria determine when the development team can initiate the release proc
 ### 1.3 Cross-Component Dependencies
 
 **Version Compatibility:**
-- ✓ All core components use unified versioning (same version number per release - see Section 2.5)
-- ✓ HyperFleet vX.Y.Z components are validated to work together as a tested set
-- ✓ Breaking changes (if any) are documented with migration guides
-- ✓ Backward compatibility: HyperFleet vX.Y.Z supports N-1 version upgrade paths (e.g., v1.5.0 → v1.6.0)
+- ✓ Each component uses independent semantic versioning (see Section 2.5)
+- ✓ HyperFleet Release X.Y defines a validated, compatibility-tested set of component versions
+- ✓ Compatibility matrix documented showing which component versions work together
+- ✓ Breaking changes (if any) are documented with migration guides and version requirements
+- ✓ Backward compatibility: Each component supports N-1 version upgrade paths independently
+- ✓ Cross-component API contracts validated during integration testing
 
 ### 1.4 Documentation Readiness
 
@@ -130,14 +134,14 @@ release-X.Y (branch maintained post-release)
 
 **Feature Freeze:**
 ```bash
-# Release Owner creates release branch from main
+# Release Owner creates release branch from main (per component repo)
 git checkout main
 git pull origin main
 git checkout -b release-1.5
 git push origin release-1.5
 
-# Create first release candidate
-git tag -a v1.5.0-rc.1 -m "Release Candidate 1 for v1.5.0"
+# Create first release candidate (per component version)
+git tag -a v1.5.0-rc.1 -m "API Service RC1 for v1.5.0"
 git push origin v1.5.0-rc.1
 ```
 
@@ -190,94 +194,137 @@ Every release receives 6 months of support from its GA date, divided into two ph
 
 ### 2.5 Versioning Strategy
 
-**HyperFleet uses unified versioning** following the OpenShift model.
+**HyperFleet uses independent component versioning** with validated release combinations.
 
-All core components (API Service, Sentinel, Adapter Framework) share the same version number for each release.
+Each core component (API Service, Sentinel, Adapter Framework) maintains its own semantic version number, evolving at its own pace based on changes and feature development.
 
 ```text
-HyperFleet v1.5.0:
-- api-service:v1.5.0
-- sentinel:v1.5.0
-- adapter-framework:v1.5.0
+HyperFleet Release 1.5 (validated combination):
+├─ api-service: v1.5.0
+├─ sentinel: v1.4.2
+└─ adapter-framework: v2.0.0
 ```
 
 **Rationale:**
-- Simplifies user experience: "Install HyperFleet v1.5.0" (not "API v1.5 + Sentinel v1.3 + Adapter v1.4")
-- All components tested together as a validated configuration
-- Clear compatibility matrix and simplified support
-- Components are tightly integrated, designed to work together
+- **Flexibility:** Components can evolve independently without forcing artificial version bumps
+- **Semantic accuracy:** Version numbers reflect actual changes (v1.4.2 → v1.4.3 for bug fix, not v1.4.2 → v1.5.0)
+- **Efficient releases:** Components without changes don't require new versions or rebuilds
+- **Clear change tracking:** Each component's version history accurately reflects its evolution
+- **Industry standard:** Aligns with microservices best practices (Kubernetes components, cloud services)
 
-**Note:** Business adapters (built on Adapter Framework) may use independent versioning based on their specific needs.
+**HyperFleet Release Number:**
+- Defines a validated, compatibility-tested set of component versions
+- Format: "HyperFleet Release X.Y" (e.g., Release 1.5, Release 1.6)
+- Documented in release notes with full compatibility matrix
+- Simplifies user experience: "Install HyperFleet Release 1.5" with clear component version mapping
 
 #### 2.5.1 Branching and Tagging Rules
 
 **Key Principles:**
-1. **Branches:** Only components with code changes need new CLM release branches (e.g., `release-1.5`)
-2. **Tags:** ALL components MUST have ALL CLM release version tags (e.g., `v1.5.0`), regardless of code changes
-3. **Important:** A component might not have all CLM release branches, but it MUST have all CLM release tags
+1. **Independent branching:** Each component creates release branches based on its own version (e.g., `release-1.5`, `release-2.0`)
+2. **Independent tagging:** Each component tags releases according to its semantic version (e.g., `v1.5.0`, `v1.4.2`, `v2.0.0`)
+3. **Selective releases:** Only components with changes create new release branches and tags
 
-**Why?** Release branches are for stabilization work (only needed when code changes); tags represent the validated release configuration (all components must be tagged to indicate they're part of the tested release set).
+**Why?** Components evolve at their own pace, and version numbers should accurately reflect actual changes.
 
-#### 2.5.2 Practical Example: HyperFleet v1.5.0 Release
+**Component-Specific Releases:**
 
-**Scenario:**
-- API Service: **Has changes**
-- Sentinel: **Has changes**
-- Adapter Framework: **No code changes**
-
-**At Feature Freeze - Create CLM Release Branches (Only for Changed Components):**
+Between HyperFleet releases, individual components can issue releases independently:
 
 ```bash
-# API Service - HAS CHANGES → Create CLM release branch
-cd openshift-hyperfleet/api-service
-git checkout -b release-1.5 && git push origin release-1.5
+# Example: Critical bug found in Sentinel after HyperFleet Release 1.5 GA
+# Current: HyperFleet Release 1.5 (API v1.5.0, Sentinel v1.4.2, Adapter v2.0.0)
 
-# Sentinel - HAS CHANGES → Create CLM release branch
+# Sentinel creates patch release v1.4.3
 cd openshift-hyperfleet/sentinel
-git checkout -b release-1.5 && git push origin release-1.5
+git checkout release-1.4
+# Apply fix, test
+git tag -a v1.4.3 -m "Sentinel v1.4.3 - Hotfix for metrics bug"
+git push origin v1.4.3
 
-# Adapter Framework - NO CHANGES → No new branch needed
-# (continues using release-1.4 CLM branch from v1.4.0 release)
+# Result: Users can upgrade just Sentinel v1.4.2 → v1.4.3 without full release
+# No new HyperFleet Release number needed for single-component release
 ```
 
-**At GA Release - Tag ALL Components with Unified Version:**
+**When to Create Component Release vs HyperFleet Release:**
+
+**Component Release:**
+
+Create a component release only for isolated, fully backward-compatible fixes within a single component that do not impact APIs, schemas, cross-component behavior, or coordinated platform upgrades.
+
+**HyperFleet Release:**
+
+Create a HyperFleet release whenever a change affects supported platform users, introduces cross-component compatibility or contract implications, delivers security or critical stability fixes, or requires coordinated, platform-wide, validated upgrades.
+
+#### 2.5.2 Practical Example: HyperFleet Release 1.5
+
+**Scenario:**
+- API Service: **Major feature** (new GitOps integration) → Version bump to v1.5.0
+- Sentinel: **Bug fixes only** → Patch version bump to v1.4.2
+- Adapter Framework: **Breaking changes** → Major version bump to v2.0.0
+
+**At Feature Freeze - Create Component-Specific Release Branches:**
 
 ```bash
-# API Service - Tag v1.5.0 from release-1.5 CLM branch
+# API Service - MINOR version bump (new features)
+cd openshift-hyperfleet/api-service
+git checkout -b release-1.5 && git push origin release-1.5
+
+# Sentinel - PATCH version bump (bug fixes only)
+cd openshift-hyperfleet/sentinel
+git checkout -b release-1.4 && git push origin release-1.4
+# (or cherry-pick to existing release-1.4 if it exists)
+
+# Adapter Framework - MAJOR version bump (breaking changes)
+cd openshift-hyperfleet/adapter-framework
+git checkout -b release-2.0 && git push origin release-2.0
+```
+
+**At GA Release - Tag Each Component with Its Own Version:**
+
+```bash
+# API Service - Tag v1.5.0 (new minor version)
 cd openshift-hyperfleet/api-service
 git checkout release-1.5
-git tag -a v1.5.0 -m "HyperFleet v1.5.0 GA"
+git tag -a v1.5.0 -m "API Service v1.5.0 - GitOps integration"
 git push origin v1.5.0
 
-# Sentinel - Tag v1.5.0 from release-1.5 CLM branch
+# Sentinel - Tag v1.4.2 (patch release)
 cd openshift-hyperfleet/sentinel
-git checkout release-1.5
-git tag -a v1.5.0 -m "HyperFleet v1.5.0 GA"
-git push origin v1.5.0
+git checkout release-1.4
+git tag -a v1.4.2 -m "Sentinel v1.4.2 - Memory leak fix"
+git push origin v1.4.2
 
-# Adapter Framework - Tag v1.5.0 from release-1.4 CLM branch
+# Adapter Framework - Tag v2.0.0 (major version)
 cd openshift-hyperfleet/adapter-framework
-git checkout release-1.4  # Reuse existing CLM branch
-git tag -a v1.5.0 -m "HyperFleet v1.5.0 GA - No code changes"
-git push origin v1.5.0
+git checkout release-2.0
+git tag -a v2.0.0 -m "Adapter Framework v2.0.0 - Plugin API v2"
+git push origin v2.0.0
 ```
 
 **Result:**
 ```text
-CLM Release Branches (components may have gaps):
+HyperFleet Release 1.5 (validated combination):
+
+Component Release Branches:
 - api-service: release-1.5
-- sentinel: release-1.4, release-1.5
-- adapter-framework: release-1.4 (no release-1.5 since no changes)
+- sentinel: release-1.4
+- adapter-framework: release-2.0
 
-Version Tags (all components have all releases):
-- api-service: v1.4.0, v1.5.0
-- sentinel: v1.4.0, v1.5.0
-- adapter-framework: v1.4.0, v1.5.0 (both tags point to same code)
+Component Version Tags:
+- api-service: v1.5.0
+- sentinel: v1.4.2
+- adapter-framework: v2.0.0
 
-Container Images:
-- registry.ci.openshift.org/hyperfleet/api-service:v1.5.0 (new build)
-- registry.ci.openshift.org/hyperfleet/sentinel:v1.5.0 (new build)
-- registry.ci.openshift.org/hyperfleet/adapter-framework:v1.5.0 (re-tagged)
+Container Images (for HyperFleet Release 1.5):
+- registry.ci.openshift.org/hyperfleet/api-service:v1.5.0
+- registry.ci.openshift.org/hyperfleet/sentinel:v1.4.2
+- registry.ci.openshift.org/hyperfleet/adapter-framework:v2.0.0
+
+Compatibility:
+- API Service v1.5.0 requires Adapter Framework ≥ v2.0.0
+- Sentinel v1.4.2 is compatible with Adapter Framework v1.x and v2.x
+- Full compatibility matrix documented in release notes
 ```
 
 ---
@@ -436,19 +483,20 @@ All PRs to release branch after code freeze require:
 For bugs discovered after GA release:
 
 ```bash
-# Create hotfix branch from release tag
-git checkout -b hotfix-1.5.1 v1.5.0
+# Example assumes Sentinel component (v1.4.x)
+# Create hotfix branch from component release tag
+git checkout -b hotfix-1.4.3 v1.4.2
 
 # Make fix, test, commit
 git commit -m "Fix critical bug in Sentinel component"
 
 # Merge to release branch
-git checkout release-1.5
-git merge --no-ff hotfix-1.5.1
+git checkout release-1.4
+git merge --no-ff hotfix-1.4.3
 
-# Tag patch release
-git tag -a v1.5.1 -m "Patch release v1.5.1"
-git push origin release-1.5 --tags
+# Tag component patch release
+git tag -a v1.4.3 -m "Patch release v1.4.3"
+git push origin release-1.4 --tags
 
 # Cherry-pick to main if applicable
 git checkout main
@@ -527,50 +575,53 @@ A dedicated release repository serves as the single source of truth for all Hype
 
 **Purpose:**
 - Centralized release notes, installation guides, and upgrade documentation
+- Defines validated component version combinations for each HyperFleet Release
 - Release tracking issues and automation scripts
 - User-facing documentation via GitHub Pages (optional)
 
 **What goes in the release repository:**
-- Release notes for each version (`releases/vX.Y.Z/release-notes.md`)
+- HyperFleet Release tags: `release-1.5`, `release-1.6` (marking validated component combinations)
+- Release notes for each HyperFleet Release (`releases/release-1.5/release-notes.md`)
+- Compatibility matrix for each release (which component versions work together)
 - Installation and upgrade guides
-- Links to container images and artifacts
-- Changelog aggregated from all components
+- Links to component container images and artifacts
+- Aggregated changelog from all components
 - Release automation scripts
 
 **What stays in component repositories:**
 - Source code
+- Component-specific git tags (e.g., `v1.5.0`, `v1.4.2`, `v2.0.0`)
 - Component-specific Helm charts
-- Component git tags
+- Component-specific CHANGELOGs
 - Development documentation
 
-**Benefits:** Single location for offering team to find all release information, cleaner separation between development and release artifacts.
+**Benefits:** Single location for offering team to find all release information, clear component version combinations for each release, cleaner separation between component development and integrated release artifacts.
 
 ### 6.1 Primary Release Artifacts
 
 **Container Images:**
 - Built automatically by Prow on release tag creation
 - Published to `registry.ci.openshift.org/hyperfleet/*`
-- **Image naming:** All components use unified HyperFleet version
+- **Image naming:** Each component uses its own independent semantic version
   ```text
-  registry.ci.openshift.org/hyperfleet/{component}:v{hyperfleet-version}
+  registry.ci.openshift.org/hyperfleet/{component}:v{component-version}
   ```
-- **Example for HyperFleet v1.5.0 release:**
+- **Example for HyperFleet Release 1.5:**
   - `registry.ci.openshift.org/hyperfleet/api-service:v1.5.0`
-  - `registry.ci.openshift.org/hyperfleet/sentinel:v1.5.0`
-  - `registry.ci.openshift.org/hyperfleet/adapter-framework:v1.5.0`
+  - `registry.ci.openshift.org/hyperfleet/sentinel:v1.4.2`
+  - `registry.ci.openshift.org/hyperfleet/adapter-framework:v2.0.0`
 
-  (All components share the same version number per Section 2.5)
+  (Each component has its own version reflecting its actual changes per Section 2.5)
 
 **Helm Charts:**
 - Each component has its own Helm chart in component repositories
   - Note: Adapter Framework base chart is designed for overlay usage by business adapters, not standalone deployment
-- Chart version matches component version
 - Note: Umbrella chart strategy (hyperfleet-chart repo) is under discussion
 
 **Git Tags:**
-- Git tags created in component repositories: `vX.Y.Z`
-- Unified release tag created in `openshift-hyperfleet/releases` repository (single source of truth for the complete HyperFleet release across all components - see Section 6.0)
-- GitHub Releases created from tags with release notes
+- Git tags created independently in component repositories: `vX.Y.Z` (reflecting each component's version)
+- HyperFleet Release tag created in `openshift-hyperfleet/releases` repository: `release-X.Y` (single source of truth for the validated component combination - see Section 6.0)
+- GitHub Releases created from tags with release notes and compatibility matrix
 
 ### 6.2 Documentation Deliverables
 
@@ -578,44 +629,51 @@ A dedicated release repository serves as the single source of truth for all Hype
 
 **Required Sections:**
 ```markdown
-# HyperFleet v1.5.0 Release Notes
+# HyperFleet Release 1.5
 
 ## Overview
 Brief description of release theme and major highlights
 
 ## What's New
 ### New Features
-- Feature 1 with description and usage example
-- Feature 2...
+- **API Service v1.5.0:** GitOps integration for ROSA deployments
+- **Adapter Framework v2.0.0:** New Plugin API v2 with enhanced extensibility
 
 ### Enhancements
-- Improvement 1
-- Performance optimization 2
+- **API Service v1.5.0:** OAuth 2.1 support, improved authentication flow
+- **Sentinel v1.4.2:** Performance improvements in metrics collection
 
 ## Breaking Changes
-- API change 1 with migration guide link
-- Deprecated feature removal
+- **Adapter Framework v2.0.0:** Plugin API v2 (migration guide: docs/plugin-migration-v2.md)
+  - Requires business adapters to update to Plugin SDK v2.0+
+- **API Service v1.5.0:** Deprecated `/v1/legacy-auth` endpoint removed
 
 ## Bug Fixes
-- Critical bug fix 1
-- High priority fix 2
+- **Sentinel v1.4.2:** Fixed memory leak in metrics collector (#234)
+- **Sentinel v1.4.2:** Fixed race condition in concurrent monitoring (#256)
+- **API Service v1.5.0:** Resolved authentication token refresh issue (#198)
 
 ## Known Issues
-- Issue 1 with workaround
-- Limitation 2
+- **Sentinel:** Metrics dashboard may show delay > 5 seconds under heavy load (workaround: increase polling interval)
+- **API Service:** GitOps integration requires Kubernetes 1.28+ for full functionality
 
 ## Upgrade Instructions
-Link to upgrade guide
+See [Upgrade Guide](docs/upgrade-to-release-1.5.md) for detailed instructions.
 
 ## Compatibility Matrix
 
-**HyperFleet v1.5.0** (unified version for all core components)
+**HyperFleet Release 1.5** (validated component combination)
 
-| Component | Version | Notes |
-|-----------|---------|-------|
-| API Service | v1.5.0 | New GitOps integration, OAuth 2.1 support |
-| Sentinel | v1.5.0 | Memory leak fix, performance improvements |
-| Adapter Framework | v1.5.0 | Dependency updates, no functional changes |
+| Component | Version | Changes | Notes |
+|-----------|---------|---------|-------|
+| API Service | **v1.5.0** | MINOR | New GitOps integration, OAuth 2.1, breaking change (legacy auth removed) |
+| Sentinel | **v1.4.2** | PATCH | Memory leak fix, performance improvements |
+| Adapter Framework | **v2.0.0** | MAJOR | Plugin API v2 (breaking), enhanced extensibility |
+
+**Component Compatibility:**
+- API Service v1.5.0 requires Adapter Framework ≥ v2.0.0
+- Sentinel v1.4.2 is compatible with Adapter Framework v1.x and v2.x
+- Business adapters must upgrade to Plugin SDK v2.0+ to work with Adapter Framework v2.0.0
 
 **Platform Compatibility:**
 
@@ -624,13 +682,10 @@ Link to upgrade guide
 | Kubernetes | 1.26 - 1.30 |
 | Helm | 3.14+ |
 
-## Dependency Versions
-- Go: 1.25
-- Base image: gcr.io/distroless/static-debian12:nonroot
-
 ## Security
-- CVEs addressed in this release
-- Security enhancements
+- **All components:** Updated dependencies to address CVE-2026-1234, CVE-2026-5678
+- **API Service v1.5.0:** Enhanced OAuth 2.1 security features
+- **Sentinel v1.4.2:** No security-specific changes
 ```
 
 **Checklist:**
@@ -673,29 +728,63 @@ Link to upgrade guide
 
 #### 6.2.4 Change Log
 
-**Format:** Keep a Changelog standard
+**Format:** Keep a Changelog standard (per component)
+
+**API Service - CHANGELOG.md:**
 ```markdown
-# Changelog
+# Changelog - API Service
 
 ## [1.5.0] - 2026-05-12
 
 ### Added
 - New GitOps integration for ROSA deployments
-- Sentinel: Real-time monitoring dashboard
+- OAuth 2.1 authentication support
 
 ### Changed
-- API: Updated authentication flow to use OAuth 2.1
-- Adapter Framework: Improved plugin loading performance
-
-### Deprecated
-- API: `/v1/legacy-auth` endpoint (will be removed in v2.0.0)
+- Updated authentication flow to use OAuth 2.1
+- Improved API response caching mechanism
 
 ### Removed
-- Support for Kubernetes 1.24 and earlier
+- `/v1/legacy-auth` endpoint (deprecated since v1.3.0)
 
 ### Fixed
-- Sentinel: Memory leak in metrics collector
-- API: Race condition in concurrent requests
+- Authentication token refresh issue
+- Race condition in concurrent API requests
+
+### Security
+- Updated dependencies to address CVE-2026-1234
+```
+
+**Sentinel - CHANGELOG.md:**
+```markdown
+# Changelog - Sentinel
+
+## [1.4.2] - 2026-05-12
+
+### Fixed
+- Memory leak in metrics collector
+- Race condition in concurrent monitoring
+
+### Security
+- Updated dependencies to address CVE-2026-5678
+```
+
+**Adapter Framework - CHANGELOG.md:**
+```markdown
+# Changelog - Adapter Framework
+
+## [2.0.0] - 2026-05-12
+
+### Added
+- Plugin API v2 with enhanced extensibility
+- Support for async plugin initialization
+
+### Changed
+- **BREAKING:** Plugin API v2 replaces v1 (migration guide: docs/plugin-migration-v2.md)
+- Improved plugin loading performance by 40%
+
+### Removed
+- **BREAKING:** Plugin API v1 support
 
 ### Security
 - Updated dependencies to address CVE-2026-1234
@@ -848,13 +937,19 @@ Based on retrospective findings and Konflux capabilities:
 ### 8.3 Success Metrics
 
 **Track and review quarterly:**
-- Release frequency (target: ~17 releases/year with 3-week cadence)
+
+**Release Metrics:**
+- HyperFleet Release frequency (target: ~17 releases/year with 3-week cadence)
+- Component patch release frequency (individual component updates between HyperFleet Releases)
 - Code freeze duration (target: < 1 week, ideally 3-4 days)
-- Hotfix frequency (target: < 2 per minor release)
-- Bug escape rate (bugs found post-GA)
-- On-time delivery (target: > 80%)
-- Mean time to patch critical vulnerabilities (target: < 48 hours)
+- On-time delivery (target: > 80% of HyperFleet Releases on schedule)
 - Stabilization phase variance (track actual vs. planned to inform process improvements)
+
+**Quality Metrics:**
+- Bug escape rate (bugs found post-GA per component and per HyperFleet Release)
+- Hotfix frequency per component (target: < 2 patch releases per component between HyperFleet Releases)
+- Mean time to patch critical vulnerabilities (target: < 48 hours for any component)
+- Cross-component compatibility issues found in production (target: 0)
 
 ---
 
@@ -901,7 +996,7 @@ Based on retrospective findings and Konflux capabilities:
 ### Appendix C: Template - Release Tracking Issue
 
 ```markdown
-# Release v1.5.0 Tracking Issue
+# HyperFleet Release 1.5 Tracking Issue
 
 ## Timeline (3-week sprint cycle)
 - Sprint Start: YYYY-MM-DD
@@ -914,11 +1009,20 @@ Based on retrospective findings and Konflux capabilities:
 ## Release Owner
 @username
 
+## Component Versions for Release 1.5
+
+| Component | Target Version | Status | Notes |
+|-----------|---------------|--------|-------|
+| API Service | v1.5.0 | 🟡 In Progress | GitOps integration, OAuth 2.1 |
+| Sentinel | v1.4.2 | 🟢 Ready | Bug fixes only |
+| Adapter Framework | v2.0.0 | 🟡 In Progress | Breaking: Plugin API v2 |
+
 ## Release Criteria Status
 - [ ] All planned features complete
-- [ ] E2E tests passing
-- [ ] No Blocker/Critical/Major bugs
-- [ ] Documentation complete
+- [ ] E2E tests passing with component combination
+- [ ] No Blocker/Critical/Major bugs in any component
+- [ ] Cross-component compatibility validated
+- [ ] Documentation complete (including compatibility matrix)
 - [ ] Pillar team sign-off
 
 ## Release Candidates
@@ -929,8 +1033,15 @@ Based on retrospective findings and Konflux capabilities:
 ## Blockers
 - None currently
 
+## Compatibility Validation
+- [ ] API Service v1.5.0 + Adapter Framework v2.0.0 integration tested
+- [ ] Sentinel v1.4.2 compatibility with all components verified
+- [ ] Backward compatibility with Release 1.4 validated
+- [ ] Breaking changes documented with migration guides
+
 ## Communication
-- [ ] Release notes drafted
+- [ ] Release notes drafted (including compatibility matrix)
+- [ ] Breaking changes highlighted
 - [ ] Stakeholders notified (T-1 week)
 - [ ] Release announcement prepared
 
@@ -938,12 +1049,17 @@ Based on retrospective findings and Konflux capabilities:
 - [ ] Retrospective scheduled
 - [ ] Metrics collected
 - [ ] Stabilization phase variance documented
+- [ ] Component version tracking updated
 ```
 
 ### Appendix D: Template - Ad-Hoc Release Request
 
 ```markdown
-# Ad-Hoc Release Request: v1.5.1
+# Ad-Hoc Release Request: HyperFleet Release 1.5.1 (or Component-Specific Patch)
+
+## Release Type
+- [ ] **Full HyperFleet Release** (multiple components, validated combination)
+- [ ] **Single Component Patch** (e.g., Sentinel v1.4.3 only, no new HyperFleet Release number)
 
 ## Requestor Information
 - **Requested by:** @username
@@ -952,12 +1068,20 @@ Based on retrospective findings and Konflux capabilities:
 - **Target release date:** YYYY-MM-DD
 
 ## Justification
-Why can't this wait for the next regular release (vX.X.0 on DATE)?
+Why can't this wait for the next regular release (HyperFleet Release X.X on DATE)?
 
 [Explain business justification, customer impact, or urgency]
 
 ## Scope
 What will be included in this ad-hoc release?
+
+### Component Version Changes
+
+| Component | Current Version (Release 1.5) | New Version | Change Type | Reason |
+|-----------|------------------------------|-------------|-------------|--------|
+| API Service | v1.5.0 | v1.5.1 | PATCH | Critical security fix |
+| Sentinel | v1.4.2 | v1.4.2 | No change | - |
+| Adapter Framework | v2.0.0 | v2.0.0 | No change | - |
 
 ### Changes Included
 - [ ] Feature/fix #1: Brief description

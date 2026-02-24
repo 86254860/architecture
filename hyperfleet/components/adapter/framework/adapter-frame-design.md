@@ -894,7 +894,7 @@ These patterns align with the workflow described in [Adapter Flow Diagrams](./ad
   "kind": "NodePool",
   "href": "https://api.hyperfleet.com/v1/clusters/111.../nodepools/222...",
   "generation": 5,
-  "owned_reference": {
+  "owner_references": {
     "id": "11111111-1111-1111-1111-111111111111",
     "kind": "Cluster",
     "href": "https://api.hyperfleet.com/v1/clusters/111..."
@@ -905,10 +905,10 @@ These patterns align with the workflow described in [Adapter Flow Diagrams](./ad
 **Field Usage:**
 - `id` - Unique ID of resource itself
 - `kind` - Type of resource (Cluster, NodePool, etc.)
-- `owned_reference.id` - For dependent resources: parent resource ID (e.g., Cluster ID for NodePool)
+- `owner_references.id` - For dependent resources: parent resource ID (e.g., Cluster ID for NodePool)
 - `generation` - Resource version for idempotency and stale event detection
 - `href` - Reference URL to fetch full resource data
-- `owned_reference` - Reference to the owner resource (if any)
+- `owner_references` - Reference to the owner resource (if any)
 
 **API Response Structure (snake_case):**
 - All API responses use snake_case for field names

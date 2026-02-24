@@ -49,7 +49,7 @@ components:
               kind: "NodePool"
               href: "https://api.hyperfleet.com/v1/clusters/11111111-1111-1111-1111-111111111111/nodepools/22222222-2222-2222-2222-222222222222"
               generation: 5
-              owned_reference:
+              owner_references:
                 id: "11111111-1111-1111-1111-111111111111"
                 kind: "Cluster"
                 href: "https://api.hyperfleet.com/v1/clusters/11111111-1111-1111-1111-111111111111"
@@ -87,7 +87,7 @@ components:
 
     ReconcileNodePool:
       type: object
-      required: [generation, owned_reference]
+      required: [generation, owner_references]
       allOf:
         - $ref: '#/components/schemas/ObjectReference'
       properties:
@@ -96,7 +96,7 @@ components:
         generation:
           type: integer
           minimum: 1
-        owned_reference:
+        owner_references:
           $ref: '#/components/schemas/ObjectReference'
 
     # --- Envelopes ---

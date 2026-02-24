@@ -31,7 +31,7 @@ data:
   kind: "NodePool"  # or "Cluster"
   href: "https://api.hyperfleet.com/v1/clusters/111.../nodepools/222..."
   generation: 5
-  owned_reference:
+  owner_references:
     id: "11111111-1111-1111-1111-111111111111"
     kind: "Cluster"
     href: "https://api.hyperfleet.com/v1/clusters/111..."

@@ -2,7 +2,7 @@
 
 **Document Status:** Draft
 **Date:** 2026-01-29
-**Last Updated:** 2026-02-10
+**Last Updated:** 2026-03-18
 
 ---
 
@@ -30,21 +30,21 @@ These criteria determine when the development team can initiate the release proc
 
 **Feature Freeze Gate:**
 - ✓ All planned features for the release milestone are code-complete
-- ✓ Feature flags are in place for any experimental or incomplete features
+- ✓ Feature toggles are in place for any experimental or incomplete features if applicable
 - ✓ Feature documentation is drafted (can be finalized during code freeze)
 
 **Technical Debt Assessment:**
-- ✓ No known security vulnerabilities rated HIGH or CRITICAL remain unaddressed
+- ✓ No known security vulnerabilities rated HIGH or CRITICAL remain unaddressed (once konflux job is supported) 
 - ✓ Technical debt has been reviewed and acceptable items are explicitly deferred to next release
 - ✓ All deprecated APIs have migration paths documented
 
 ### 1.2 Testing & Quality Gates
 
 - **CI/CD Pipeline Health:** Prow CI pipeline is green for all components on the main branch, validating:
-  - Unit tests: ≥70% coverage for new code
+  - Unit tests: Passing consistently (coverage ensured by pre-submit jobs, not part of release gating)
   - Integration tests: Passing consistently
   - E2E tests: Critical user journeys validated
-  - Performance regression tests: No degradation >10% vs. previous release
+  - Performance regression tests: No degradation >10% vs. previous release (once performance testing is supported)
 
 - **Build**:
   - Container images: Build successfully for all target architectures
@@ -104,10 +104,16 @@ main (development branch)
 After GA:
 release-X.Y (branch maintained post-release)
   │
-  ├─── vX.Y.1 (tag - Patch release via cherry-picks)
-  ├─── vX.Y.2 (tag - Patch release)
+  ├─── vX.Y.1 (tag - Z-stream/patch release, NO RC)
+  ├─── vX.Y.2 (tag - Z-stream/patch release, NO RC)
   └─── ... (support window: 6 months)
 ```
+
+**Note on Z-Stream (Patch) Releases:**
+- Z-stream releases (vX.Y.1, vX.Y.2, etc.) **do not require Release Candidate (RC) tags**
+- These releases go directly from testing to GA tag
+- Scope limited to bug fixes, security patches, and minor improvements (no new features or breaking changes)
+- Faster turnaround for low-risk fixes while maintaining quality gates
 
 ### 2.2 Timeline and Freeze Process
 
@@ -256,6 +262,53 @@ Create a component release only for isolated, fully backward-compatible fixes wi
 
 Create a HyperFleet release whenever a change affects supported platform users, introduces cross-component compatibility or contract implications, delivers security or critical stability fixes, or requires coordinated, platform-wide, validated upgrades.
 
+**Supporting Repository Branching for HyperFleet Releases:**
+
+When creating a HyperFleet release, the following supporting repositories also participate in the release process:
+
+**For Major/Minor Releases (e.g., HyperFleet Release 1.5):**
+
+1. **hyperfleet-e2e** - E2E test suites
+   - Create `release-1.5` branch at Feature Freeze
+   - Contains E2E tests validating the specific component combinations for this release
+
+2. **hyperfleet-infra** - Infrastructure configurations
+   - Create `release-1.5` branch at Feature Freeze (if infrastructure changes needed)
+   - Contains deployment scripts, cluster configs aligned with this release
+
+3. **hyperfleet-release** - Release coordination and documentation
+   - Create `release-1.5` branch at Feature Freeze
+   - Contains release notes, compatibility matrices, installation guides
+   - Tag the release: `release-1.5` at GA
+
+**For Patch Releases (e.g., HyperFleet Release 1.5.1, 1.5.2):**
+
+Supporting repositories **do not create new branches** for patch releases:
+
+1. **hyperfleet-e2e, hyperfleet-infra**
+   - Stay on existing `release-1.5` branch
+   - Commit updates/fixes to the same branch as needed
+
+2. **hyperfleet-release**
+   - Stay on existing `release-1.5` branch
+   - Update release notes and compatibility matrix
+   - **Create new tag** for each patch: `release-1.5.1`, `release-1.5.2`
+
+   ```bash
+   # Example: HyperFleet Release 1.5.1 (patch)
+   cd openshift-hyperfleet/hyperfleet-release
+   git checkout release-1.5
+
+   # Update release notes with patch changes
+   # (e.g., API Service v1.5.0 → v1.5.1)
+
+   # Tag the patch release
+   git tag -a release-1.5.1 -m "HyperFleet Release 1.5.1 (API v1.5.1, Sentinel v1.4.2, Adapter v2.0.0)"
+   git push origin release-1.5.1
+   ```
+
+**Rationale:** Patch releases are incremental updates on the same base release. Supporting repos use the same branch infrastructure with updated content and new tags to mark each patch version.
+
 #### 2.5.2 Practical Example: HyperFleet Release 1.5
 
 **Scenario:**
@@ -332,6 +385,39 @@ Compatibility:
 ## 3. Release Readiness Criteria
 
 Before declaring a release as "GA-Ready", all the following criteria must be satisfied:
+
+### 3.0 Prow Job Configuration for Release Branches
+
+After creating release branches for components and supporting repositories, Prow jobs must be configured to support release branch builds and testing.
+
+**Required Prow Job Configuration:**
+
+**1. Copy Build Jobs for Release Images**
+
+After cutting component release branches (e.g., `release-1.5` for API Service, `release-1.4` for Sentinel):
+
+- **Action:** Copy existing Prow jobs that build container images from `main` branch
+- **Update:** Configure copied jobs to trigger on release branch commits
+- **Purpose:** Enable automated image builds from release branches when fixes are merged
+- **Result:** Release images automatically built and pushed to registry when release branch is updated
+
+**2. Copy E2E Prow Jobs for Nightly Release Testing**
+
+After cutting `hyperfleet-e2e` release branch (e.g., `release-1.5`):
+
+- **Action:** Copy E2E test Prow jobs that run nightly on `main` branch
+- **Update:** Configure copied jobs to:
+  - Run against the release branch E2E test suite
+  - Test the validated component version combination for this release
+  - Trigger nightly to detect regressions in release branch
+- **Purpose:** Continuous validation of release stability throughout support lifecycle
+- **Result:** Early detection of issues in release branches before they reach users
+
+**Best Practices:**
+- Copy jobs at Feature Freeze when release branches are created
+- Maintain consistent naming convention: `{job-name}-release-X.Y`
+- Monitor nightly release test results for regressions
+- Disable nightly jobs when release reaches EOL (after 6 months)
 
 ### 3.1 Testing & Validation (Mandatory)
 

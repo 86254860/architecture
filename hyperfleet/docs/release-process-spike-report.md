@@ -2,7 +2,7 @@
 
 **Document Status:** Draft
 **Date:** 2026-01-29
-**Last Updated:** 2026-03-18
+**Last Updated:** 2026-03-19
 
 ---
 
@@ -1039,7 +1039,160 @@ Based on retrospective findings and Konflux capabilities:
 
 ---
 
-## 9. Appendices
+## 9. Release Owner Checklist
+
+This section provides a comprehensive, phase-by-phase checklist for the Release Owner to manage the entire release cycle. Use this checklist to track progress, verify criteria, and ensure all gates are met.
+
+**How to use this checklist:**
+1. Copy the relevant phase checklist as the release progresses
+2. For each item, verify the criteria using the specified approach
+3. Coordinate with check owners to complete mandatory items
+4. Use Slack templates (Appendix D) for team communication
+5. Update the Release Tracking Issue (Appendix C) with status
+
+---
+
+### Phase 1: Pre-Release Preparation (Weeks 1-2 - Development Phase)
+
+**Timing:** Sprint start through development phase
+**Goal:** Ensure team is ready for upcoming release and entry criteria are being tracked
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 1.1 | Create Release Tracking Issue | Issue created in `openshift-hyperfleet/releases` repo using Appendix C template | Use GitHub issue template, fill in timeline and component versions | Release Owner | M | [Template E.1](#appendix-d-slack-communication-templates) |
+| 1.2 | Announce Release Owner and Timeline | Team aware of Release Owner, Feature Freeze date, Code Freeze date, GA target | Post to #hyperfleet-releases Slack channel | Release Owner | M | [Template E.1](#appendix-d-slack-communication-templates) |
+| 1.3 | Verify Planned Features Status | All milestone features are on track, component owners confirm readiness | Review component roadmaps, sync with component tech leads | Component Tech Leads | M | Daily standups |
+| 1.4 | Monitor CI/CD Pipeline Health | Prow CI green on `main` branch for all components | Check Prow dashboard daily | Dev Team | M | Alert in Slack if broken > 4 hours |
+| 1.5 | Track High/Critical CVEs | No CRITICAL/HIGH security vulnerabilities unaddressed | Review vulnerability scan reports weekly | Security/Dev Team | M | Escalate blockers immediately |
+| 1.6 | Verify Documentation Drafts Exist | Release notes, API docs, upgrade guides in draft state | Check docs repo for draft content | Tech Writer/Dev Team | M | N/A |
+| 1.7 | Review Technical Debt Backlog | Known issues reviewed, deferred items explicitly documented | Tech debt triage meeting (mid-sprint) | Tech Leads | O | Document decisions in tracking issue |
+
+**Decision Point:** By end of Week 2, Release Owner confirms readiness for Feature Freeze (go/no-go decision)
+
+---
+
+### Phase 2: Feature Freeze (Start of Week 3)
+
+**Timing:** Start of Week 3 (exact date per release calendar)
+**Goal:** Lock down feature scope, create release branches, cut RC.1
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 2.1 | **Go/No-Go Decision for Feature Freeze** | All Section 1 entry criteria met (features complete, CI green, docs drafted) | Review Release Tracking Issue checklist, sync with tech leads | Release Owner + Tech Leads | M | [Template E.2](#appendix-d-slack-communication-templates) |
+| 2.2 | Create Component Release Branches | Release branches created for each component with changes (e.g., `release-1.5`, `release-2.0`) per Section 2.5.1 | Execute git commands per Section 2.3 for each component | Release Owner | M | Announce branch creation in Slack |
+| 2.3 | Create Supporting Repo Branches | Release branches created in `hyperfleet-e2e`, `hyperfleet-infra`, `hyperfleet-release` | Execute git commands per Section 2.5 | Release Owner | M | N/A |
+| 2.4 | Configure Prow Jobs for Release Branches | Build jobs and nightly E2E jobs copied and configured per Section 3.0 | Update Prow config, submit PR to openshift/release repo | Release Owner + CI Team | M | Verify jobs run successfully |
+| 2.5 | Tag Release Candidates (RC.1) | RC.1 tags created for each component (e.g., `v1.5.0-rc.1`) | Execute git tag commands per Section 2.3 | Release Owner | M | [Template E.3](#appendix-d-slack-communication-templates) |
+| 2.6 | Verify RC.1 Images Built | Container images built and pushed to registry for all components | Check registry: `registry.ci.openshift.org/hyperfleet/*:vX.Y.Z-rc.1` | Release Owner | M | Alert CI team if build fails |
+| 2.7 | Lock Main Branch? (Optional) | `main` branch remains open for next release development (v1.6) - no lock needed | Communicate to team that main is open for next release | Release Owner | O | [Template E.3](#appendix-d-slack-communication-templates) |
+| 2.8 | Update Release Tracking Issue | Status updated to "Feature Freeze", RC.1 tagged | Update GitHub issue | Release Owner | M | N/A |
+
+**Communication:** Post Feature Freeze announcement with RC.1 details and branch protection rules (Slack Template E.3)
+
+---
+
+### Phase 3: Stabilization (Week 3, Post-Feature Freeze)
+
+**Timing:** After Feature Freeze through Code Freeze (2-4 days)
+**Goal:** Execute full test suite, fix bugs, finalize documentation
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 3.1 | Execute E2E Test Suite | All critical user workflows validated, E2E tests passing | Run `hyperfleet-e2e` test suite against RC.1 component combination | QA Team | M | Report test results daily |
+| 3.2 | Execute Backward Compatibility Tests | N-1 version upgrade path validated | Test upgrade from previous release to current RC | QA Team | M | Document upgrade issues |
+| 3.3 | Execute Performance Regression Tests | No performance degradation > 10% vs. previous release | Run performance benchmarks (if automated) | QA Team | O (MVP) | Report regressions immediately |
+| 3.4 | Bug Triage and Severity Assignment | All bugs discovered have severity assigned (Blocker/Critical/Major/Normal/Minor) | Daily bug triage meetings using Section 4.1 process | Release Owner + Dev Leads | M | [Template E.4](#appendix-d-slack-communication-templates) |
+| 3.5 | Fix Blocker/Critical Bugs | All Blocker/Critical bugs resolved or downgraded | Implement fixes in `main`, cherry-pick to release branch per Section 2.3 | Dev Team | M | Track in tracking issue |
+| 3.6 | Fix Major Bugs | All Major bugs resolved or explicitly deferred (with justification) | Fix in `main`, cherry-pick to release branch OR defer with documented rationale | Dev Team | M | Document deferrals in tracking issue |
+| 3.7 | Cherry-Pick Process Validation | All cherry-picks follow standard process (PR from main → release branch) | Review all release branch PRs for approval and testing | Release Owner | M | Approve each cherry-pick PR |
+| 3.8 | Finalize Release Notes | Release notes complete with all sections per Section 6.2.1 | Review draft, add final features/bugs, validate compatibility matrix | Tech Writer + Release Owner | M | Review with tech leads |
+| 3.9 | Finalize API Documentation | OpenAPI spec, API reference, breaking changes documented | Generate from code, publish to docs site | Dev Team | M (if API changes) | N/A |
+| 3.10 | Finalize Upgrade Guide | Upgrade instructions tested and validated | Manual upgrade test from N-1 version | QA Team + Tech Writer | M | N/A |
+| 3.11 | Cross-Component Compatibility Validation | Compatibility matrix tested, all component version combinations validated | Integration testing with validated component versions | QA Team | M | Report compatibility issues immediately |
+| 3.12 | Cut Additional RCs (if needed) | RC.2, RC.3 cut after bug fixes, each RC triggers full regression test | Tag new RC per Section 2.3 after merging fixes | Release Owner | M (if bugs fixed) | [Template E.5](#appendix-d-slack-communication-templates) |
+
+**Decision Point:** When stabilization is complete and all Major+ bugs resolved → proceed to Code Freeze
+
+---
+
+### Phase 4: Code Freeze (Week 3, Late - 1-2 days before GA)
+
+**Timing:** 1-2 days before GA target
+**Goal:** Final lockdown, only critical/blocker fixes allowed, final validation
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 4.1 | **Code Freeze Announcement** | Team aware that only Blocker/Critical fixes allowed with Release Owner approval | Post Code Freeze announcement to Slack | Release Owner | M | [Template E.6](#appendix-d-slack-communication-templates) |
+| 4.2 | Verify Bug Severity Gates (Section 3.2) | No open Blocker/Critical/Major bugs (Normal+ for MVP) | Review Jira/GitHub issues filter by severity and release version | Release Owner | M | N/A |
+| 4.3 | Execute Final E2E Test Suite | All E2E tests passing on latest RC | Run full `hyperfleet-e2e` suite | QA Team | M | Report results in Slack |
+| 4.4 | Execute Final Integration Tests | All integration tests passing | Run Prow integration test jobs | QA Team | M | Check Prow dashboard |
+| 4.5 | Verify Container Image Vulnerability Scan | No CRITICAL/HIGH CVEs in final RC images | Run vulnerability scanner (e.g., Trivy, Clair) on RC images | Security Team | M | Block release if CRITICAL/HIGH found |
+| 4.6 | Validate Helm Charts | Helm charts package without errors and deploy successfully | Test Helm install in clean cluster | QA Team | M | Document packaging issues |
+| 4.7 | Verify All Release Artifacts | Container images, Helm charts, git tags, checksums available | Check registry, chart repo, GitHub tags per Section 6.1 | Release Owner | M | N/A |
+| 4.8 | Documentation Final Review | All docs (release notes, upgrade guide, API docs) reviewed and published | Final review by Tech Writer and Tech Leads | Tech Writer + Tech Leads | M | Approve docs PR |
+| 4.9 | Stakeholder Sign-Off | Pillar teams and stakeholders approve release | Email/Slack confirmation from key stakeholders | Release Owner | M | [Template E.7](#appendix-d-slack-communication-templates) |
+
+**Decision Point:** All gates passed → proceed to GA Release
+
+---
+
+### Phase 5: GA Release Day
+
+**Timing:** Release day (end of Week 3 per release calendar)
+**Goal:** Tag GA release, publish artifacts, announce to users
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 5.1 | Final Go/No-Go Decision | All Phase 4 checks complete, no blockers | Final sync meeting with tech leads | Release Owner + Tech Leads | M | [Template E.8](#appendix-d-slack-communication-templates) |
+| 5.2 | Tag GA Release (Component Tags) | Component version tags created (e.g., `v1.5.0`, `v1.4.2`, `v2.0.0`) per Section 2.5 | Execute git tag commands for each component | Release Owner | M | N/A |
+| 5.3 | Tag GA Release (HyperFleet Release Tag) | HyperFleet Release tag created in `releases` repo (e.g., `release-1.5`) | Execute git tag in `openshift-hyperfleet/releases` repo | Release Owner | M | N/A |
+| 5.4 | Verify GA Container Images Built | GA images built and pushed to registry with final version tags | Check registry: `registry.ci.openshift.org/hyperfleet/*:vX.Y.Z` | Release Owner | M | Alert CI team if build fails |
+| 5.5 | Create GitHub Releases | GitHub Releases created from tags with release notes and compatibility matrix | Use GitHub UI or `gh` CLI per Section 6.1 | Release Owner | M | N/A |
+| 5.6 | Publish Helm Charts | Helm charts published to chart repository (if applicable) | Package and push charts to chart repo | Release Owner | M (if chart repo exists) | N/A |
+| 5.7 | Publish Release Notes | Release notes published to docs site and GitHub Releases | Merge docs PR, publish to docs.hyperfleet.io | Tech Writer | M | N/A |
+| 5.8 | Update Compatibility Matrix | Compatibility matrix updated in docs and `releases` repo | Update compatibility table per Section 6.2.1 | Tech Writer | M | N/A |
+| 5.9 | Release Announcement (Internal) | Internal teams notified of GA release | Post to #hyperfleet-releases, #hyperfleet-general | Release Owner | M | [Template E.9](#appendix-d-slack-communication-templates) |
+| 5.10 | Release Announcement (External) | Users/customers notified of GA release (if applicable) | Email announcement, blog post, social media | Product Marketing | O | Coordinate with PM team |
+| 5.11 | Update Release Tracking Issue | Tracking issue updated to "Released", close issue | Update GitHub issue, add final notes | Release Owner | M | N/A |
+
+**Communication:** Celebrate with team! Post GA announcement with release notes link and highlights
+
+---
+
+### Phase 6: Post-Release (Week 4+)
+
+**Timing:** After GA release through next sprint
+**Goal:** Monitor release health, gather feedback, improve process
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 6.1 | Monitor Release Health (First 24-48 hours) | No critical issues reported, metrics stable | Monitor dashboards, Slack channels, support tickets | Release Owner + On-call Team | M | Escalate issues immediately |
+| 6.2 | Collect Release Metrics | Release metrics captured per Section 8.3 | Extract data: code freeze duration, on-time delivery, bug escape rate | Release Owner | M | Document in retrospective notes |
+| 6.3 | Schedule Release Retrospective | Retrospective scheduled within 1 week of GA | Create calendar invite, prepare retrospective agenda | Release Owner | M | Invite all contributors |
+| 6.4 | Conduct Release Retrospective | Team feedback gathered, process improvements identified | Run retrospective meeting using standard format | Release Owner | M | [Template E.10](#appendix-d-slack-communication-templates) |
+| 6.5 | Document Lessons Learned | Retrospective action items documented and assigned | Update release process doc or create improvement tickets | Release Owner | M | Share with team |
+| 6.6 | Update Release Calendar | Next release dates published (if not already scheduled) | Update shared release calendar | Release Owner | M | Announce next release timeline |
+| 6.7 | Handoff to Next Release Owner | Next Release Owner identified and briefed | Transition meeting, share lessons learned | Current + Next Release Owner | M | N/A |
+| 6.8 | Enable Nightly Release Branch Testing | Prow nightly jobs running on release branch per Section 3.0 | Verify nightly jobs configured and running | CI Team | M | Monitor for regressions |
+
+---
+
+### Phase 7: Ongoing Release Branch Maintenance (Post-GA)
+
+**Timing:** Ongoing for 6 months (support window per Section 2.4)
+**Goal:** Maintain release branch with patch releases as needed
+
+| # | Check Item | Criteria | Approach | Owner | M/O | Comm |
+|---|-----------|----------|----------|-------|-----|------|
+| 7.1 | Monitor Release Branch Health | Nightly E2E tests passing on release branch | Review Prow nightly test results | Release Owner (rotating) | M | Alert team if failures |
+| 7.2 | Triage Patch Release Requests | Bugs evaluated for backport per Section 2.4 decision tree | Review bug severity, release age, backport criteria | Component Tech Leads | M | Use Section 4 process |
+| 7.3 | Execute Patch Releases (Z-Stream) | Patch releases (e.g., v1.5.1) cut as needed per Section 2.1 (no RC required) | Follow hotfix workflow per Section 4.4 | Release Owner (rotating) | M | [Template E.11](#appendix-d-slack-communication-templates) |
+| 7.4 | Update Support Lifecycle Status | Release phase tracked (Full Support → Security Maintenance → EOL) | Update release tracking doc with lifecycle phase | Release Owner | M | Notify users 1 month before EOL |
+| 7.5 | Disable Nightly Jobs at EOL | Prow nightly jobs disabled when release reaches 6 months EOL | Disable Prow jobs per Section 3.0 | CI Team | M | N/A |
+
+---
+
+## 10. Appendices
 
 ### Appendix A: References and Sources
 
@@ -1138,7 +1291,420 @@ Based on retrospective findings and Konflux capabilities:
 - [ ] Component version tracking updated
 ```
 
-### Appendix D: Template - Ad-Hoc Release Request
+### Appendix D: Slack Communication Templates
+
+This appendix provides Slack message templates for Release Owner communication throughout the release cycle. Copy and customize these templates as needed.
+
+---
+
+#### Template E.1: Release Kickoff Announcement (Phase 1)
+
+**Channel:** `#hyperfleet-releases`
+**When:** Sprint start (Week 1)
+
+```
+:rocket: **HyperFleet Release 1.5 - Release Kickoff**
+
+Hello team! I'm the Release Owner for **HyperFleet Release 1.5**.
+
+**Timeline:**
+• Sprint Start: [YYYY-MM-DD]
+• Feature Freeze: [YYYY-MM-DD] (Start of Week 3)
+• Code Freeze: [YYYY-MM-DD] (End of Week 3)
+• GA Target: [YYYY-MM-DD]
+
+**Component Versions:**
+• API Service: v1.5.0 (new GitOps integration)
+• Sentinel: v1.4.2 (bug fixes)
+• Adapter Framework: v2.0.0 (breaking: Plugin API v2)
+
+**Release Tracking Issue:** [Link to GitHub issue]
+
+**Action Items:**
+• All features for this release must be merged to `main` by Feature Freeze date
+• Documentation drafts (release notes, API docs, upgrade guides) should be in progress
+• Please flag any potential blockers ASAP
+
+Questions? Tag me or comment on the tracking issue.
+```
+
+---
+
+#### Template E.2: Feature Freeze Go/No-Go Decision (Phase 2)
+
+**Channel:** `#hyperfleet-releases`
+**When:** End of Week 2 (before Feature Freeze)
+
+```
+:traffic_light: **HyperFleet Release 1.5 - Feature Freeze Go/No-Go Decision**
+
+Team, we're approaching Feature Freeze for Release 1.5 (scheduled for [DATE]). Here's our readiness status:
+
+**Entry Criteria Status:**
+✅ All planned features code-complete
+✅ CI/CD pipeline green on main
+✅ No CRITICAL/HIGH CVEs
+⚠️ Documentation drafts in progress (finalizing this week)
+✅ Feature toggles in place for experimental features
+
+**Component Readiness:**
+• API Service (v1.5.0): ✅ Ready
+• Sentinel (v1.4.2): ✅ Ready
+• Adapter Framework (v2.0.0): ✅ Ready
+
+**Decision: GO for Feature Freeze on [DATE]**
+
+**Next Steps:**
+• Release branches will be created on [DATE]
+• RC.1 will be tagged on [DATE]
+• `main` branch remains open for v1.6 development after Feature Freeze
+
+Any concerns or blockers? Please raise them NOW.
+```
+
+---
+
+#### Template E.3: Feature Freeze Announcement (Phase 2)
+
+**Channel:** `#hyperfleet-releases`, `#hyperfleet-dev`
+**When:** Feature Freeze day (Start of Week 3)
+
+```
+:snowflake: **Feature Freeze - HyperFleet Release 1.5**
+
+Feature Freeze is now in effect for Release 1.5!
+
+**Release Branches Created:**
+• `openshift-hyperfleet/api-service` → release-1.5
+• `openshift-hyperfleet/sentinel` → release-1.4
+• `openshift-hyperfleet/adapter-framework` → release-2.0
+• `openshift-hyperfleet/hyperfleet-e2e` → release-1.5
+• `openshift-hyperfleet/hyperfleet-release` → release-1.5
+
+**Release Candidate:**
+• RC.1 tagged: API Service v1.5.0-rc.1, Sentinel v1.4.2-rc.1, Adapter Framework v2.0.0-rc.1
+• Container images: registry.ci.openshift.org/hyperfleet/*:vX.Y.Z-rc.1
+
+**Branch Policy (Starting Now):**
+• `main` branch: **OPEN** for v1.6 development - business as usual
+• `release-X.Y` branches: **RESTRICTED** - only bug fixes allowed (see rules below)
+
+**How to get bug fixes into Release 1.5:**
+1. Create PR to fix bug in `main` branch → Merge
+2. Cherry-pick the fix to release branch via new PR → I will review and approve
+3. All release branch PRs require Release Owner approval + Prow green
+
+**Stabilization Phase:**
+• E2E testing in progress
+• Bug triage meetings: Daily at [TIME] ([Zoom link])
+• Target Code Freeze: [DATE]
+• Target GA: [DATE]
+
+Questions? Tag me!
+```
+
+---
+
+#### Template E.4: Bug Triage Announcement (Phase 3)
+
+**Channel:** `#hyperfleet-releases`
+**When:** Daily during Stabilization Phase
+
+```
+:bug: **Daily Bug Triage - HyperFleet Release 1.5 - [DATE]**
+
+**Current Bug Status:**
+• Blocker: 0
+• Critical: 1 (API Service #234 - auth token issue) - Fix in progress by @dev1
+• Major: 2 (Sentinel #256 - metrics lag, Adapter #298 - plugin load error)
+• Normal: 5 (tracked for v1.5.1)
+
+**Decisions from Today's Triage:**
+• #234 (Critical): Fix merged to main, cherry-picking to release-1.5 today
+• #256 (Major): Downgraded to Normal - workaround documented, will fix in v1.5.1
+• #298 (Major): Fix targeted for EOD today, will cut RC.2 tomorrow if fixed
+
+**Action Required:**
+• @dev1: Complete cherry-pick PR for #234 by EOD
+• @dev2: Complete fix for #298 by EOD, add test coverage
+
+**Next Triage:** Tomorrow [TIME] ([Zoom link])
+
+See tracking issue for full bug list: [Link]
+```
+
+---
+
+#### Template E.5: New Release Candidate Announcement (Phase 3)
+
+**Channel:** `#hyperfleet-releases`, `#hyperfleet-dev`
+**When:** After cutting RC.2, RC.3, etc.
+
+```
+:package: **Release Candidate RC.2 - HyperFleet Release 1.5**
+
+RC.2 has been tagged with bug fixes from Stabilization Phase.
+
+**What's in RC.2:**
+• Fixed: API Service #234 - Authentication token refresh issue (Critical)
+• Fixed: Adapter Framework #298 - Plugin loading error (Major)
+• Regression test suite passing ✅
+
+**Tags:**
+• API Service: v1.5.0-rc.2
+• Sentinel: v1.4.2-rc.1 (no changes from RC.1)
+• Adapter Framework: v2.0.0-rc.2
+
+**Container Images:**
+• registry.ci.openshift.org/hyperfleet/api-service:v1.5.0-rc.2
+• registry.ci.openshift.org/hyperfleet/sentinel:v1.4.2-rc.1
+• registry.ci.openshift.org/hyperfleet/adapter-framework:v2.0.0-rc.2
+
+**Testing in Progress:**
+• Full E2E test suite running now (ETA: 2 hours)
+• Backward compatibility testing (N-1 upgrade)
+
+**Code Freeze:** Target [DATE] if testing passes
+```
+
+---
+
+#### Template E.6: Code Freeze Announcement (Phase 4)
+
+**Channel:** `#hyperfleet-releases`, `#hyperfleet-dev`
+**When:** Code Freeze day (1-2 days before GA)
+
+```
+:ice_cube: **Code Freeze - HyperFleet Release 1.5**
+
+Code Freeze is now in effect. We're in the final stretch!
+
+**Branch Policy (Effective Immediately):**
+• `release-X.Y` branches: **LOCKED** - Only Blocker/Critical fixes with Release Owner approval
+• All PRs to release branches must include:
+  - Bug severity: Blocker or Critical
+  - Justification why it cannot wait for patch release
+  - Risk assessment
+  - Test coverage
+
+**Current Status:**
+• Latest RC: RC.2 (or RC.3 if applicable)
+• E2E tests: ✅ Passing
+• Integration tests: ✅ Passing
+• Vulnerability scan: ✅ No CRITICAL/HIGH CVEs
+• Documentation: ✅ Finalized
+• Open bugs: 0 Blocker, 0 Critical, 0 Major
+
+**GA Target:** [DATE] (2 days from now)
+
+**Final Validation:**
+• Stakeholder sign-off in progress
+• Final artifact verification today
+• Go/No-Go decision: [DATE TIME]
+
+We're almost there! :rocket:
+```
+
+---
+
+#### Template E.7: Stakeholder Sign-Off Request (Phase 4)
+
+**Channel:** Direct message or `#hyperfleet-stakeholders`
+**When:** 1 day before GA
+
+```
+:white_check_mark: **HyperFleet Release 1.5 - Stakeholder Sign-Off Request**
+
+Hello! We're ready for GA release and need your final approval.
+
+**Release Summary:**
+• HyperFleet Release 1.5
+• Component versions: API Service v1.5.0, Sentinel v1.4.2, Adapter Framework v2.0.0
+• GA Target: [DATE]
+
+**Quality Gates:**
+✅ All E2E tests passing
+✅ All integration tests passing
+✅ No CRITICAL/HIGH CVEs
+✅ Backward compatibility validated (N-1 upgrade tested)
+✅ Documentation complete (release notes, upgrade guide, API docs)
+✅ No open Blocker/Critical/Major bugs
+
+**Release Artifacts Ready:**
+• Container images published to registry
+• Helm charts packaged and tested
+• Release notes: [Link to preview]
+• Upgrade guide: [Link to preview]
+
+**Request:** Please review and provide sign-off by [DATE TIME].
+Reply with ✅ to approve or raise concerns.
+
+Questions? Let me know!
+```
+
+---
+
+#### Template E.8: GA Release Go/No-Go Decision (Phase 5)
+
+**Channel:** `#hyperfleet-releases`
+**When:** GA Release Day (morning)
+
+```
+:rocket: **HyperFleet Release 1.5 - Final Go/No-Go Decision**
+
+Team, it's GA day! Here's our final readiness check:
+
+**All Gates Passed:**
+✅ All testing complete (E2E, integration, backward compatibility)
+✅ Vulnerability scan clean (no CRITICAL/HIGH CVEs)
+✅ Documentation finalized and published
+✅ Stakeholder sign-off received
+✅ Release artifacts verified (images, Helm charts, tags)
+✅ No open Blocker/Critical/Major bugs
+
+**Decision: GO for GA Release**
+
+**GA Release Timeline Today:**
+• 10:00 AM - Tag GA release (component tags + HyperFleet Release tag)
+• 10:30 AM - Verify GA images built
+• 11:00 AM - Create GitHub Releases
+• 11:30 AM - Publish release notes to docs site
+• 12:00 PM - **GA Announcement** :tada:
+
+I'll post updates as we progress. Stand by!
+```
+
+---
+
+#### Template E.9: GA Release Announcement (Phase 5)
+
+**Channel:** `#hyperfleet-releases`, `#hyperfleet-general`, `#hyperfleet-users`
+**When:** GA Release Day (after all artifacts published)
+
+```
+:tada: **HyperFleet Release 1.5 is now Generally Available!** :tada:
+
+We're excited to announce HyperFleet Release 1.5 is officially released!
+
+**What's New:**
+• **API Service v1.5.0:** GitOps integration for ROSA deployments, OAuth 2.1 support
+• **Adapter Framework v2.0.0:** New Plugin API v2 with enhanced extensibility
+• **Sentinel v1.4.2:** Memory leak fix, performance improvements
+
+**Release Artifacts:**
+• Container Images: registry.ci.openshift.org/hyperfleet/*:vX.Y.Z
+• Release Notes: [Link to docs]
+• Upgrade Guide: [Link to docs]
+• GitHub Release: [Link to GitHub]
+
+**Compatibility:**
+• Kubernetes: 1.26 - 1.30
+• Helm: 3.14+
+• Backward compatible with Release 1.4 (N-1 upgrade tested)
+
+**Breaking Changes:**
+• Adapter Framework: Plugin API v2 (see migration guide: [Link])
+• API Service: Removed deprecated `/v1/legacy-auth` endpoint
+
+**Installation:**
+```bash
+# Helm installation example
+helm repo update
+helm install hyperfleet hyperfleet/hyperfleet --version 1.5.0
+```
+
+**Upgrade from Release 1.4:**
+See upgrade guide: [Link]
+
+**Known Issues:**
+See release notes for known issues and workarounds: [Link]
+
+**Thank you** to everyone who contributed to this release! :clap:
+
+**Feedback:** Please report issues in [GitHub Issues] or #hyperfleet-support
+
+**Next Release:** HyperFleet Release 1.6 scheduled for [DATE]
+```
+
+---
+
+#### Template E.10: Release Retrospective Invitation (Phase 6)
+
+**Channel:** `#hyperfleet-releases`
+**When:** 1-3 days after GA
+
+```
+:hourglass: **HyperFleet Release 1.5 - Retrospective Meeting**
+
+Great job on Release 1.5, team! Let's gather feedback and identify improvements.
+
+**Retrospective Meeting:**
+• **Date:** [DATE]
+• **Time:** [TIME]
+• **Duration:** 60 minutes
+• **Zoom:** [Link]
+• **Agenda Doc:** [Link to shared doc]
+
+**Please come prepared to discuss:**
+• What went well? (Keep doing)
+• What didn't go well? (Stop doing)
+• What can we improve? (Start doing)
+• Specific pain points during this release cycle
+
+**Pre-Retrospective Input:**
+If you can't attend, please add your feedback to the agenda doc before the meeting.
+
+**Release Metrics to Review:**
+• Code freeze duration: X days (target: < 1 week)
+• On-time delivery: [Yes/No]
+• Bug escape rate: X bugs post-GA
+• Component patch releases needed: X (target: < 2)
+
+See you there!
+```
+
+---
+
+#### Template E.11: Patch Release Announcement (Phase 7)
+
+**Channel:** `#hyperfleet-releases`, `#hyperfleet-general`
+**When:** Patch release (v1.5.1, v1.5.2, etc.)
+
+```
+:package: **HyperFleet Release 1.5.1 (Patch Release) Available**
+
+We've released **HyperFleet Release 1.5.1**, a patch release with critical bug fixes.
+
+**What's Fixed:**
+• **API Service v1.5.1:** Fixed critical bug in GitOps integration (#345)
+• **Sentinel v1.4.2:** No changes
+• **Adapter Framework v2.0.0:** No changes
+
+**Release Type:** Patch release (bug fixes only, no new features)
+
+**Upgrade:**
+This is a **drop-in replacement** for Release 1.5.0. No migration required.
+
+```bash
+# Helm upgrade
+helm upgrade hyperfleet hyperfleet/hyperfleet --version 1.5.1
+```
+
+**Container Images:**
+• registry.ci.openshift.org/hyperfleet/api-service:v1.5.1
+• registry.ci.openshift.org/hyperfleet/sentinel:v1.4.2 (unchanged)
+• registry.ci.openshift.org/hyperfleet/adapter-framework:v2.0.0 (unchanged)
+
+**Release Notes:** [Link to patch release notes]
+
+**Compatibility:** Same as Release 1.5.0 (see compatibility matrix)
+
+**Recommendation:** All users on Release 1.5.0 should upgrade to 1.5.1 to benefit from these fixes.
+```
+
+---
+
+### Appendix E: Template - Ad-Hoc Release Request
 
 ```markdown
 # Ad-Hoc Release Request: HyperFleet Release 1.5.1 (or Component-Specific Patch)
